@@ -1,0 +1,57 @@
+erDiagram
+    proposals ||--|| projects : "project_id"
+    proposals ||--|| human_resources : "human_resource_id"
+    proposals ||--|| flow_master : "flow_id"
+    proposals ||--|| result_master : "result_id"
+    proposals ||--|| result_detail_master : "result_detail_id"
+    proposals ||--|| users : "proposer_id"
+    projects ||--|| clients : "client_id"
+    human_resources ||--|| clients : "client_id"
+    result_detail_master ||--|| result_master : "result_id"
+
+    proposals {
+        string id PK
+        datetime proposal_date
+        string proposer_id
+        string project_id
+        string human_resource_id
+        int flow_id
+        int result_id
+        int result_detail_id
+        string memo
+    }
+    projects {
+        string id PK
+        string name
+        string client_id
+        string details
+    }
+    human_resources {
+        string id PK
+        string initials
+        int age
+        string client_id
+        string details
+    }
+    clients {
+        string id PK
+        string name
+    }
+    flow_master {
+        int id PK
+        string name
+    }
+    result_master {
+        int id PK
+        string name
+    }
+    result_detail_master {
+        int id PK
+        int result_id
+        string description
+    }
+    users {
+        string id PK
+        string name
+        string email
+    }

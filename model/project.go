@@ -4,12 +4,12 @@ import "time"
 
 type Project struct {
 	ID                       string     `gorm:"primaryKey" json:"id"`
-	EmailID                  string     `json:"email_id"`
+	EmailID                  string     `gorm:"type:varchar(255)" json:"email_id"`
 	EmailSubject             *string    `json:"email_subject,omitempty"`
 	EmailSender              *string    `json:"email_sender,omitempty"`
 	EmailReceivedAt          *time.Time `json:"email_received_at,omitempty"`
 	ProjectStartMonth        *time.Time `json:"project_start_month,omitempty"`
-	Prefecture               *string    `json:"prefecture,omitempty"`
+	Prefecture               *string    `gorm:"type:varchar(255)" json:"prefecture,omitempty"`
 	WorkLocation             *string    `json:"work_location,omitempty"`
 	RemoteWorkFrequency      *string    `json:"remote_work_frequency,omitempty"`
 	WorkingHours             *string    `json:"working_hours,omitempty"`

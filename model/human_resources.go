@@ -4,14 +4,14 @@ import "time"
 
 type HumanResource struct {
 	ID                   string     `gorm:"primaryKey" json:"id"`
-	EmailID              string     `json:"email_id"`
+	EmailID              string     `gorm:"type:varchar(255)" json:"email_id"`
 	EmailSubject         *string    `json:"email_subject,omitempty"`
 	EmailSender          *string    `json:"email_sender,omitempty"`
 	EmailReceivedAt      *time.Time `json:"email_received_at,omitempty"`
 	AttachmentFilename   *string    `json:"attachment_filename,omitempty"`
 	CandidateInitial     *string    `json:"candidate_initial,omitempty"`
 	Age                  *uint8     `json:"age,omitempty"`
-	Prefecture           *string    `json:"prefecture,omitempty"`
+	Prefecture           *string    `gorm:"type:varchar(255)" json:"prefecture,omitempty"`
 	NearestStation       *string    `json:"nearest_station,omitempty"`
 	WorkConditions       *string    `json:"work_conditions,omitempty"`
 	EmploymentType       *string    `json:"employment_type,omitempty"`
