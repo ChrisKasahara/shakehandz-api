@@ -37,7 +37,7 @@ erDiagram
         unit_price_min int
         unit_price_max int
         unit_price_unit string
-        business_flow string
+        business_flow stringp
         business_flow_restrictions string
         priority_talent string
         project_summary string
