@@ -1,0 +1,74 @@
+{
+  "info": {
+    "name": "shakehandz-api",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "projects",
+      "item": [
+        {
+          "name": "Get Projects",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "http://localhost:8080/projects",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "8080",
+              "path": ["projects"]
+            }
+          }
+        },
+        {
+          "name": "Get Project by ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "http://localhost:8080/projects/:id",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "8080",
+              "path": ["projects", ":id"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "human_resources",
+      "item": [
+        {
+          "name": "Get Human Resources",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "http://localhost:8080/human_resources",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "8080",
+              "path": ["human_resources"]
+            }
+          }
+        },
+        {
+          "name": "Get Human Resource by ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "http://localhost:8080/human_resources/:id",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "8080",
+              "path": ["human_resources", ":id"]
+            }
+          }
+        }
+      ]
+    }
+  ]
+}
