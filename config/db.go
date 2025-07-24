@@ -29,7 +29,7 @@ func InitDB() *gorm.DB {
 		log.Fatal("DB接続失敗:", err)
 	}
 
-	if err := db.AutoMigrate(&model.Project{}, &model.HumanResource{}); err != nil {
+	if err := db.AutoMigrate(&model.Project{}, &model.HumanResource{}, &model.User{}); err != nil {
 		log.Fatal("マイグレーション失敗:", err)
 	}
 

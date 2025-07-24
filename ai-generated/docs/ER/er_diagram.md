@@ -98,7 +98,9 @@ erDiagram
 
     users {
         id string PK
+        google_id string UNIQUE NOT NULL
+        email string NOT NULL
         name string
-        email string
+        picture string
     }
 ```

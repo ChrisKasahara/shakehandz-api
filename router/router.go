@@ -9,6 +9,18 @@ import (
 
 func SetupRouter(db *gorm.DB) *gin.Engine {
 	r := gin.Default()
+
+	// CORS: allow http://localhost:3000
+	r.Use(func(c *gin.Context) {
+		c.Writer.Header().Set("Access-Control-Allow-Origin", "http://localhost:3000")
+		c.Writer.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+		c.Writer.Header().Set("Access-Control-Allow-Headers", "Authorization, Content-Type")
+		if c.Request.Method == "OPTIONS" {
+			c.AbortWithStatus(204)
+			return
+		}
+		c.Next()
+	})
 	projectHandler := handler.NewProjectHandler(db)
 	humanHandler := handler.NewHumanResourcesHandler(db)
 
@@ -23,6 +35,10 @@ func SetupRouter(db *gorm.DB) *gin.Engine {
 		humanResources.GET("", humanHandler.GetHumanResources)
 		humanResources.GET("/:id", humanHandler.GetHumanResource)
 	}
+
+	// Google ID Token Login
+	googleLoginHandler := handler.NewGoogleLoginHandler(db)
+	r.POST("/api/auth/google-login", googleLoginHandler.GoogleLogin)
 
 	return r
 }
