@@ -1,4 +1,4 @@
-package model
+package humanresource
 
 import (
 	"time"

@@ -1,8 +1,7 @@
-package handler
+package humanresource
 
 import (
 	"net/http"
-	"shakehandz-api/model"
 
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
@@ -18,7 +17,7 @@ func NewHumanResourcesHandler(db *gorm.DB) *HumanResourcesHandler {
 
 // GET /human_resources
 func (h *HumanResourcesHandler) GetHumanResources(c *gin.Context) {
-	var humans []model.HumanResource
+	var humans []HumanResource
 	if err := h.DB.Find(&humans).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "取得失敗"})
 		return
@@ -29,7 +28,7 @@ func (h *HumanResourcesHandler) GetHumanResources(c *gin.Context) {
 // GET /human_resources/:id
 func (h *HumanResourcesHandler) GetHumanResource(c *gin.Context) {
 	id := c.Param("id")
-	var human model.HumanResource
+	var human HumanResource
 	if err := h.DB.First(&human, "id = ?", id).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "見つかりません"})
 		return

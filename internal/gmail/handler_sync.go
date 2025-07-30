@@ -1,4 +1,4 @@
-package handler
+package gmail
 
 import (
 	"context"
