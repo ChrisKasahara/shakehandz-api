@@ -4,11 +4,11 @@ import (
 	"shakehandz-api/handler"
 
 	"github.com/gin-gonic/gin"
-	"google.golang.org/genai"
+	"github.com/google/generative-ai-go/genai"
 	"gorm.io/gorm"
 )
 
-func SetupRouter(db *gorm.DB, genaiClient *genai.Client) *gin.Engine {
+func SetupRouter(db *gorm.DB, genaiClient *genai.GenerativeModel) *gin.Engine {
 	r := gin.Default()
 
 	// CORS: allow http://localhost:3000
@@ -38,11 +38,12 @@ func SetupRouter(db *gorm.DB, genaiClient *genai.Client) *gin.Engine {
 		humanResources.GET("/:id", humanHandler.GetHumanResource)
 	}
 
+	// Gmail API
+	r.GET("/gmail/messages", handler.GmailMessagesHandler)
+
 	// Google ID Token Login
 	googleLoginHandler := handler.NewGoogleLoginHandler(db)
 	r.POST("/api/auth/google-login", googleLoginHandler.GoogleLogin)
-
-	r.POST("/api/gemini/greet", geminiHandler.Greet)
 	r.POST("/api/gemini/convert", geminiHandler.Convert)
 	return r
 }

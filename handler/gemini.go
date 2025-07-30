@@ -2,47 +2,29 @@ package handler
 
 import (
 	"context"
+	"fmt"
 	"log"
-	"net/http"
+	"strings"
 
 	"github.com/gin-gonic/gin"
-	"google.golang.org/genai"
+	"github.com/google/generative-ai-go/genai"
+
+	"shakehandz-api/prompts"
 )
 
 type GeminiHandler struct {
-	Client *genai.Client
+	Client *genai.GenerativeModel
 }
 
-func NewGeminiHandler(client *genai.Client) *GeminiHandler {
+func NewGeminiHandler(client *genai.GenerativeModel) *GeminiHandler {
 	return &GeminiHandler{Client: client}
 }
 
 type ConvertRequest struct {
-	Text string `"json:"text"`
+	Text string `json:"text"`
 }
-
 type ConvertResponse struct {
-	Converted string `"json:"converted"`
-}
-
-func (h *GeminiHandler) Greet(c *gin.Context) {
-	ctx := context.Background()
-
-	result, err := h.Client.Models.GenerateContent(
-		ctx,
-		"gemini-2.5-flash",
-		genai.Text("こんにちは！"),
-		nil,
-	)
-	if err != nil {
-		log.Printf("GenerateContent error: %v", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Gemini API 呼び出し失敗"})
-		return
-	}
-
-	c.JSON(http.StatusOK, gin.H{
-		"greeting": result.Text(),
-	})
+	Converted string `json:"converted"`
 }
 
 func (h *GeminiHandler) Convert(c *gin.Context) {
@@ -52,54 +34,59 @@ func (h *GeminiHandler) Convert(c *gin.Context) {
 		return
 	}
 
-	prompt := `
-送信されたメールの本文から要員情報をJSON形式で抽出してください。
-不明な項目はnullにしてください。
-また、出力すべき結果のみを返してください。Modelからのフィードバックなどは不要です。
-
-type HumanResource struct {
-	ID                   string     "gorm:"primaryKey" json:"id"
-	EmailID              string     "gorm:"type:varchar(255)" json:"email_id"
-	EmailSubject         *string    "json:"email_subject,omitempty"
-	EmailSender          *string    "json:"email_sender,omitempty"
-	EmailReceivedAt      *time.Time "json:"email_received_at,omitempty"
-	AttachmentFilename   *string    "json:"attachment_filename,omitempty"
-	CandidateInitial     *string    "json:"candidate_initial,omitempty"
-	Age                  *uint8     "json:"age,omitempty"
-	Prefecture           *string    "gorm:"type:varchar(255)" json:"prefecture,omitempty"
-	NearestStation       *string    "json:"nearest_station,omitempty"
-	WorkConditions       *string    "json:"work_conditions,omitempty"
-	EmploymentType       *string    "json:"employment_type,omitempty"
-	MainLangFW           *string    "json:"main_lang_fw,omitempty"
-	MainSkills           *string    "json:"main_skills,omitempty"
-	ExperiencePhases     *string    "json:"experience_phases,omitempty"
-	AvailableStartMonth  *string    "json:"available_start_month,omitempty"
-	HourlyRateMin        *uint      "json:"hourly_rate_min,omitempty"
-	HourlyRateMax        *uint      "json:"hourly_rate_max,omitempty"
-	HourlyRateUnit       *string    "json:"hourly_rate_unit,omitempty"
-	AdditionalInfo       *string    "json:"additional_info,omitempty"
-	ExtractionConfidence *float64   "json:"extraction_confidence,omitempty"
-	ExtractionNotes      *string    "json:"extraction_notes,omitempty"
-	CareerSummary        *string    "json:"career_summary,omitempty"
-	RegisteredAt         *time.Time "json:"registered_at,omitempty"
-}
-
-` + req.Text
-
 	ctx := context.Background()
-	result, err := h.Client.Models.GenerateContent(
-		ctx,
-		"gemini-2.5-flash",
-		genai.Text(prompt),
-		nil,
-	)
+
+	chat := h.Client.StartChat()
+
+	readyText, err := chat.SendMessage(ctx, genai.Text(prompts.HRInstruction))
+
+	isReady := false
+	if readyText != nil && len(readyText.Candidates) > 0 {
+		var sb strings.Builder
+		for _, part := range readyText.Candidates[0].Content.Parts {
+			if txt, ok := part.(genai.Text); ok {
+				sb.WriteString(string(txt))
+			}
+		}
+		isReady = sb.String() == "ready"
+	} else {
+		fmt.Println("Instruction Response にテキスト候補がありませんでした")
+	}
+
+	// “ready” の確認（大小文字無視）
+	if !isReady {
+		c.JSON(500, gin.H{"error": "Gemini から 'ready' が返ってきませんでした"})
+		return
+	}
+
+	fmt.Println("Geminiは準備を終えているようです。続いて変換処理を行います。")
+
+	result, err := chat.SendMessage(ctx, genai.Text(req.Text))
+
 	if err != nil {
 		log.Printf("Gemini API 呼び出し失敗: %v", err)
 		c.JSON(500, gin.H{"error": "Gemini API 呼び出し失敗"})
 		return
 	}
 
+	// 生成されたテキストを抽出する
+	var generatedText string
+	if result != nil && len(result.Candidates) > 0 {
+		var partsBuilder strings.Builder
+		for _, part := range result.Candidates[0].Content.Parts {
+			if txt, ok := part.(genai.Text); ok {
+				partsBuilder.WriteString(string(txt))
+			}
+		}
+		generatedText = partsBuilder.String()
+	} else {
+		// 候補がない場合やエラーの場合の処理
+		log.Println("Gemini API から有効なレスポンス候補がありませんでした。")
+		c.JSON(500, gin.H{"error": "Gemini API から有効なレスポンスがありません"})
+		return
+	}
+
 	c.JSON(200, ConvertResponse{
-		Converted: result.Text(),
+		Converted: generatedText,
 	})
 }
