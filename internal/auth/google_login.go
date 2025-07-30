@@ -1,12 +1,10 @@
-package handler
+package auth
 
 import (
 	"context"
 	"net/http"
 	"os"
 	"strings"
-
-	"shakehandz-api/model"
 
 	"github.com/gin-gonic/gin"
 	"google.golang.org/api/idtoken"
@@ -40,7 +38,7 @@ func (h *GoogleLoginHandler) GoogleLogin(c *gin.Context) {
 	email, _ := payload.Claims["email"].(string)
 	picture, _ := payload.Claims["picture"].(string)
 
-	user := model.User{
+	user := User{
 		GoogleID: sub,
 		Email:    email,
 		Name:     name,
@@ -48,7 +46,7 @@ func (h *GoogleLoginHandler) GoogleLogin(c *gin.Context) {
 	}
 
 	// Upsert: GoogleIDで検索し、なければ新規作成、あれば更新
-	var existing model.User
+	var existing User
 	result := h.DB.Where("google_id = ?", sub).First(&existing)
 	if result.Error == nil {
 		// 更新

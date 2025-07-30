@@ -6,12 +6,11 @@ import (
 	"log"
 	"os"
 
-	"github.com/gin-gonic/gin"
 	"github.com/google/generative-ai-go/genai"
 	"github.com/joho/godotenv"
 	"google.golang.org/api/option"
 
-	"shakehandz-api/internal/gmail"
+	"shakehandz-api/internal/router"
 )
 
 func main() {
@@ -31,13 +30,7 @@ func main() {
 	}
 	defer genaiClient.Close()
 
-	r := gin.Default()
-
-	// Gmail API
-	r.GET("/api/gmail/sync", gmail.GmailMessagesHandler)
-	// r.POST("/api/gmail/process", gmail.NewProcessHandler(...)) // handler_proc.go 実装後に追加
-
-	// 他ドメインのルーティングもここに追加
+	r := router.SetupRouter()
 
 	if err := r.Run(":8080"); err != nil {
 		log.Fatalf("サーバー起動失敗: %v", err)
