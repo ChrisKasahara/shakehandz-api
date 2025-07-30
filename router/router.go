@@ -44,6 +44,8 @@ func SetupRouter(db *gorm.DB, genaiClient *genai.GenerativeModel) *gin.Engine {
 	// Google ID Token Login
 	googleLoginHandler := handler.NewGoogleLoginHandler(db)
 	r.POST("/api/auth/google-login", googleLoginHandler.GoogleLogin)
+
 	r.POST("/api/gemini/convert", geminiHandler.Convert)
+
 	return r
 }

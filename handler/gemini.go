@@ -10,6 +10,7 @@ import (
 	"github.com/google/generative-ai-go/genai"
 
 	"shakehandz-api/prompts"
+	"shakehandz-api/utils"
 )
 
 type GeminiHandler struct {
@@ -38,55 +39,43 @@ func (h *GeminiHandler) Convert(c *gin.Context) {
 
 	chat := h.Client.StartChat()
 
-	readyText, err := chat.SendMessage(ctx, genai.Text(prompts.HRInstruction))
+	readyResp, err := chat.SendMessage(ctx, genai.Text(prompts.HRInstruction))
 
-	isReady := false
-	if readyText != nil && len(readyText.Candidates) > 0 {
-		var sb strings.Builder
-		for _, part := range readyText.Candidates[0].Content.Parts {
-			if txt, ok := part.(genai.Text); ok {
-				sb.WriteString(string(txt))
-			}
-		}
-		isReady = sb.String() == "ready"
-	} else {
-		fmt.Println("Instruction Response にテキスト候補がありませんでした")
-	}
-
-	// “ready” の確認（大小文字無視）
-	if !isReady {
-		c.JSON(500, gin.H{"error": "Gemini から 'ready' が返ってきませんでした"})
-		return
-	}
-
-	fmt.Println("Geminiは準備を終えているようです。続いて変換処理を行います。")
-
-	result, err := chat.SendMessage(ctx, genai.Text(req.Text))
-
+	// Geminiに変換用の指示プロンプトを記憶させる
+	readyStr, ok := utils.ExtractText(readyResp)
 	if err != nil {
 		log.Printf("Gemini API 呼び出し失敗: %v", err)
 		c.JSON(500, gin.H{"error": "Gemini API 呼び出し失敗"})
 		return
 	}
 
+	if !ok || strings.ToLower(strings.TrimSpace(readyStr)) != "ready" {
+		c.JSON(500, gin.H{"error": "'ready' が返ってきませんでした"})
+		return
+	}
+
+	// Geminiから「ready」が返ってきたことを確認
+	fmt.Println("Geminiは準備を終えているようです。続いて変換処理を行います。")
+
+	// 変換処理をGeminiに依頼
+	result, err := chat.SendMessage(ctx, genai.Text(req.Text))
+
+	// req.Textは配列であるためJSON形式に変換してから最大5つのオブジェクトに切り分けてGeminiに送信
+
 	// 生成されたテキストを抽出する
-	var generatedText string
-	if result != nil && len(result.Candidates) > 0 {
-		var partsBuilder strings.Builder
-		for _, part := range result.Candidates[0].Content.Parts {
-			if txt, ok := part.(genai.Text); ok {
-				partsBuilder.WriteString(string(txt))
-			}
-		}
-		generatedText = partsBuilder.String()
-	} else {
-		// 候補がない場合やエラーの場合の処理
-		log.Println("Gemini API から有効なレスポンス候補がありませんでした。")
+	structuredEmailText, ok := utils.ExtractText(result)
+	if err != nil {
+		log.Printf("Gemini API 呼び出し失敗: %v", err)
+		c.JSON(500, gin.H{"error": "Gemini API 呼び出し失敗"})
+		return
+	}
+
+	if !ok {
 		c.JSON(500, gin.H{"error": "Gemini API から有効なレスポンスがありません"})
 		return
 	}
 
 	c.JSON(200, ConvertResponse{
-		Converted: generatedText,
+		Converted: structuredEmailText,
 	})
 }

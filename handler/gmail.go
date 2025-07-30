@@ -45,7 +45,7 @@ func GmailMessagesHandler(c *gin.Context) {
 	}
 
 	// メッセージID一覧取得 (has:attachment クエリはそのまま維持)
-	msgsList, err := srv.Users.Messages.List("me").MaxResults(50).Q("has:attachment").Do()
+	msgsList, err := srv.Users.Messages.List("me").MaxResults(5).Q("has:attachment").Do()
 	if err != nil {
 		log.Printf("Error listing messages: %v", err) // ログ追加
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Unable to list messages"})
