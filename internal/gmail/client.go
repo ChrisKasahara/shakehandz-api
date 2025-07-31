@@ -10,6 +10,7 @@ import (
 )
 
 // NewService はGmail APIクライアントを初期化して返す
-func NewService(ctx context.Context, token *oauth2.Token) (*gmail.Service, error) {
-	return gmail.NewService(ctx, option.WithTokenSource(oauth2.StaticTokenSource(token)))
+func NewService(ctx context.Context, token string) (*gmail.Service, error) {
+	ts := oauth2.StaticTokenSource(&oauth2.Token{AccessToken: token})
+	return gmail.NewService(ctx, option.WithTokenSource(ts))
 }

@@ -1,21 +1,14 @@
-// Gmail メール処理キュー登録用ハンドラ
 package gmail
 
 import (
-	"context"
 	"fmt"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
-	"golang.org/x/oauth2"
 )
 
-type Fetcher interface {
-	FetchMessageIDList(ctx context.Context, token *oauth2.Token, query string, max int) ([]interface{}, error)
-}
-
-// Fetcher インターフェースは fetcher.go で定義されている想定
-func NewProcessHandler(f Fetcher) gin.HandlerFunc {
+// ProcessServiceをDI
+func NewProcessHandler(svc *ProcessService) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		ctx := c.Request.Context()
 
@@ -32,15 +25,11 @@ func NewProcessHandler(f Fetcher) gin.HandlerFunc {
 			return
 		}
 
-		token := &oauth2.Token{AccessToken: accessToken}
-
-		// メール取得（has:attachment, 最大5件）
-		mails, err := f.FetchMessageIDList(ctx, token, "has:attachment", 5)
+		n, err := svc.Run(ctx, accessToken)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch mails"})
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to process mails"})
 			return
 		}
-		n := len(mails)
 
 		// TODO: ここで取得したメールを解析キューに積む処理を実装予定
 		//       解析ロジック・Gemini呼び出しは未実装

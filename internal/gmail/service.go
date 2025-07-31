@@ -3,27 +3,24 @@ package gmail
 
 import (
 	"context"
-	"errors"
-	"shakehandz-api/internal/gemini"
+	shm "shakehandz-api/internal/shared/mail"
 )
 
-// ProcessAndSaveMessages: fetcherで取得したメッセージをGeminiで解析しDB保存
-func ProcessAndSaveMessages(ctx context.Context, messages []string, geminiClient *gemini.GeminiHandler, db any) error {
-	if len(messages) == 0 {
-		return errors.New("no messages to process")
+// ProcessService: fetcherをDI
+type ProcessService struct {
+	Fetcher shm.Fetcher
+}
+
+func NewProcessService(f shm.Fetcher) *ProcessService {
+	return &ProcessService{Fetcher: f}
+}
+
+// Run: メール取得→（解析・保存は未実装）
+func (s *ProcessService) Run(ctx context.Context, token string) (int, error) {
+	msgs, err := s.Fetcher.Fetch(ctx, token, "has:attachment", 5)
+	if err != nil {
+		return 0, err
 	}
-	// Geminiで解析（仮実装・未実装のためコメントアウト）
-	/*
-		for _, msg := range messages {
-			result, err := geminiClient.Analyze(ctx, msg)
-			if err != nil {
-				return err
-			}
-			// DB保存（仮実装）
-			if err := db.SaveAnalysisResult(ctx, result); err != nil {
-				return err
-			}
-		}
-	*/
-	return nil
+	// TODO: Gemini解析・DB保存（未実装）
+	return len(msgs), nil
 }

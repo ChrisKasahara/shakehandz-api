@@ -29,9 +29,10 @@ func SetupRouter() *gin.Engine {
 	db := config.InitDB()
 
 	// Gmail
-	r.GET("/api/gmail/messages", gmail.GmailMessagesHandler)
-	// Gmail メール処理キュー登録
-	r.POST("/api/gmail/process", gmail.NewProcessHandler(gmail.NewFetcher()))
+	f := gmail.NewFetcher()
+	svc := gmail.NewProcessService(f)
+	r.GET("/api/gmail/sync", gmail.NewSyncHandler(f))
+	r.POST("/api/gmail/process", gmail.NewProcessHandler(svc))
 
 	// HumanResource
 	hrHandler := humanresource.NewHumanResourcesHandler(db)
