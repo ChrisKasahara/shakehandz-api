@@ -5,6 +5,7 @@ import (
 	"shakehandz-api/internal/auth"
 	"shakehandz-api/internal/gmail"
 	"shakehandz-api/internal/humanresource"
+	gf "shakehandz-api/internal/mail/gmail"
 	"shakehandz-api/internal/project"
 	config "shakehandz-api/internal/shared"
 	"time"
@@ -29,10 +30,9 @@ func SetupRouter() *gin.Engine {
 	db := config.InitDB()
 
 	// Gmail
-	f := gmail.NewFetcher()
-	svc := gmail.NewProcessService(f)
-	r.GET("/api/gmail/sync", gmail.NewSyncHandler(f))
-	r.POST("/api/gmail/process", gmail.NewProcessHandler(svc))
+	fetcher := gf.New()
+	r.GET("/api/gmail/sync", gmail.NewSyncHandler(fetcher))
+	// gemini/gmailの他ルーティングもfetcherを使う場合は同様に修正
 
 	// HumanResource
 	hrHandler := humanresource.NewHumanResourcesHandler(db)

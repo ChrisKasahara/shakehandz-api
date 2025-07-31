@@ -1,5 +1,4 @@
-// Gmail共通Fetcher・DTO定義
-package gmail
+package gmailfetcher
 
 import (
 	"context"
@@ -10,7 +9,7 @@ import (
 	"strings"
 	"sync"
 
-	shm "shakehandz-api/internal/shared/mail"
+	mail "shakehandz-api/internal/mail"
 
 	"golang.org/x/sync/errgroup"
 	"google.golang.org/api/gmail/v1"
@@ -24,12 +23,12 @@ type Attachment struct {
 
 type fetcher struct{}
 
-func NewFetcher() shm.Fetcher {
+func New() mail.Fetcher {
 	return &fetcher{}
 }
 
 // Fetch: メッセージID一覧取得→詳細取得→DTO化
-func (f *fetcher) Fetch(ctx context.Context, token, query string, max int64) ([]*shm.Message, error) {
+func (f *fetcher) Fetch(ctx context.Context, token, query string, max int64) ([]*mail.Message, error) {
 	srv, err := NewService(ctx, token)
 	if err != nil {
 		return nil, err
@@ -39,12 +38,12 @@ func (f *fetcher) Fetch(ctx context.Context, token, query string, max int64) ([]
 		return nil, err
 	}
 	if len(msgsList.Messages) == 0 {
-		return []*shm.Message{}, nil
+		return []*mail.Message{}, nil
 	}
 
 	g := new(errgroup.Group)
 	var mu sync.Mutex
-	var result []*shm.Message
+	var result []*mail.Message
 
 	for _, m := range msgsList.Messages {
 		mid := m.Id
@@ -75,7 +74,7 @@ func (f *fetcher) Fetch(ctx context.Context, token, query string, max int64) ([]
 }
 
 // メッセージ詳細→DTO
-func parseMessage(msg *gmail.Message) (*shm.Message, error) {
+func parseMessage(msg *gmail.Message) (*mail.Message, error) {
 	if msg == nil || msg.Payload == nil {
 		return nil, errors.New("empty message")
 	}
@@ -92,7 +91,7 @@ func parseMessage(msg *gmail.Message) (*shm.Message, error) {
 	}
 	plainBody := ExtractPlainText(msg.Payload)
 	htmlBody := "" // 必要ならHTML抽出ロジック追加
-	return &shm.Message{
+	return &mail.Message{
 		ID:        msg.Id,
 		Subject:   subject,
 		From:      from,

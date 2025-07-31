@@ -1,5 +1,4 @@
-// Gmail APIクライアント初期化
-package gmail
+package gmailfetcher
 
 import (
 	"context"

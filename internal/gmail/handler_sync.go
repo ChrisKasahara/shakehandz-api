@@ -4,13 +4,13 @@ import (
 	"fmt"
 	"net/http"
 
-	shm "shakehandz-api/internal/shared/mail"
+	mail "shakehandz-api/internal/mail"
 
 	"github.com/gin-gonic/gin"
 )
 
 // Gmail同期API: Fetcherを使ってメール一覧を返す
-func NewSyncHandler(f shm.Fetcher) gin.HandlerFunc {
+func NewSyncHandler(f mail.Fetcher) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		ctx := c.Request.Context()
 		authHeader := c.GetHeader("Authorization")
