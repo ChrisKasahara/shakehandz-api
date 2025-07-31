@@ -1,25 +1,23 @@
+// Gmailサービス層: fetcherの結果をGemini解析・DB保存
 package gemini
 
 import (
 	"context"
-
-	mail "shakehandz-api/internal/shared/mail"
-
-	"github.com/google/generative-ai-go/genai"
+	msg "shakehandz-api/internal/shared/message"
 )
 
-type Service struct {
-	Fetcher mail.Fetcher
-	Client  *genai.GenerativeModel
+// GmailMessageFetcherはGmailのメッセージをGeminiで解析するためのインターフェース
+type GmailMessageFetcher struct {
+	MessageFetcher msg.MessageFetcher
 }
 
-func NewService(f mail.Fetcher, c *genai.GenerativeModel) *Service {
-	return &Service{Fetcher: f, Client: c}
+func NewMessageFetcherWithGemini(msgF msg.MessageFetcher) *GmailMessageFetcher {
+	return &GmailMessageFetcher{MessageFetcher: msgF}
 }
 
-// Run: メール取得→（Gemini解析・保存は未実装）
-func (s *Service) Run(ctx context.Context, token string) (int, error) {
-	msgs, err := s.Fetcher.Fetch(ctx, token, "has:attachment", 5)
+// Fetch: メール取得→（解析・保存は未実装）
+func (s *GmailMessageFetcher) Fetch(ctx context.Context, token string) (int, error) {
+	msgs, err := s.MessageFetcher.FetchMsg(ctx, token, "has:attachment", 5)
 	if err != nil {
 		return 0, err
 	}

@@ -1,3 +1,10 @@
 {
-  "cSpell.words": ["datatypes", "geminiutil", "genai", "gorm", "shakehandz"]
+  "cSpell.words": [
+    "datatypes",
+    "geminiutil",
+    "genai",
+    "gmsg",
+    "gorm",
+    "shakehandz"
+  ]
 }

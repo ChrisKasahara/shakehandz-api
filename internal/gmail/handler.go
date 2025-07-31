@@ -4,13 +4,13 @@ import (
 	"fmt"
 	"net/http"
 
-	mail "shakehandz-api/internal/shared/mail"
+	mail "shakehandz-api/internal/shared/message"
 
 	"github.com/gin-gonic/gin"
 )
 
 // Gmail同期API: Fetcherを使ってメール一覧を返す
-func NewSyncHandler(f mail.Fetcher) gin.HandlerFunc {
+func NewGmailHandler(f mail.MessageFetcher) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		ctx := c.Request.Context()
 		authHeader := c.GetHeader("Authorization")
@@ -24,7 +24,7 @@ func NewSyncHandler(f mail.Fetcher) gin.HandlerFunc {
 			c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid Authorization header"})
 			return
 		}
-		msgs, err := f.Fetch(ctx, accessToken, "has:attachment", 5)
+		msgs, err := f.FetchMsg(ctx, accessToken, "has:attachment", 5)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch mails"})
 			return

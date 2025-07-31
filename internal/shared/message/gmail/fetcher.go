@@ -1,4 +1,4 @@
-package gmailfetcher
+package message_gmail
 
 import (
 	"context"
@@ -9,7 +9,7 @@ import (
 	"strings"
 	"sync"
 
-	mail "shakehandz-api/internal/shared/mail"
+	msg "shakehandz-api/internal/shared/message"
 
 	"golang.org/x/sync/errgroup"
 	"google.golang.org/api/gmail/v1"
@@ -23,12 +23,22 @@ type Attachment struct {
 
 type fetcher struct{}
 
-func New() mail.Fetcher {
+func New() msg.MessageFetcher {
 	return &fetcher{}
 }
 
+func (fetcher *fetcher) FetchMsg(ctx context.Context, token, query string, max int64) ([]*msg.Message, error) {
+	if token == "" {
+		return nil, errors.New("token is required")
+	}
+	if max <= 0 {
+		max = 10 // デフォルト値
+	}
+	return fetcher.Fetch(ctx, token, query, max)
+}
+
 // Fetch: メッセージID一覧取得→詳細取得→DTO化
-func (f *fetcher) Fetch(ctx context.Context, token, query string, max int64) ([]*mail.Message, error) {
+func (fetcher *fetcher) Fetch(ctx context.Context, token, query string, max int64) ([]*msg.Message, error) {
 	srv, err := NewService(ctx, token)
 	if err != nil {
 		return nil, err
@@ -38,12 +48,12 @@ func (f *fetcher) Fetch(ctx context.Context, token, query string, max int64) ([]
 		return nil, err
 	}
 	if len(msgsList.Messages) == 0 {
-		return []*mail.Message{}, nil
+		return []*msg.Message{}, nil
 	}
 
 	g := new(errgroup.Group)
 	var mu sync.Mutex
-	var result []*mail.Message
+	var result []*msg.Message
 
 	for _, m := range msgsList.Messages {
 		mid := m.Id
@@ -74,12 +84,13 @@ func (f *fetcher) Fetch(ctx context.Context, token, query string, max int64) ([]
 }
 
 // メッセージ詳細→DTO
-func parseMessage(msg *gmail.Message) (*mail.Message, error) {
-	if msg == nil || msg.Payload == nil {
+func parseMessage(gmsg *gmail.Message) (*msg.Message, error) {
+	if gmsg == nil || gmsg.Payload == nil {
 		return nil, errors.New("empty message")
 	}
-	subject, from, date := "", "", ""
-	for _, h := range msg.Payload.Headers {
+	var subject, from, date, to, cc, replyTo string
+
+	for _, h := range gmsg.Payload.Headers {
 		switch h.Name {
 		case "Subject":
 			subject = h.Value
@@ -87,18 +98,26 @@ func parseMessage(msg *gmail.Message) (*mail.Message, error) {
 			from = h.Value
 		case "Date":
 			date = h.Value
+		case "To":
+			to = h.Value
+		case "Cc":
+			cc = h.Value
+		case "Reply-To": // 返信先
+			replyTo = h.Value
 		}
 	}
-	plainBody := ExtractPlainText(msg.Payload)
+	plainBody := ExtractPlainText(gmsg.Payload)
 	htmlBody := "" // 必要ならHTML抽出ロジック追加
-	return &mail.Message{
-		ID:        msg.Id,
+	return &msg.Message{
+		Id:        gmsg.Id,
 		Subject:   subject,
 		From:      from,
 		Date:      date,
 		PlainBody: plainBody,
-		HTMLBody:  htmlBody,
-		// Attachments等は後続タスクで
+		HtmlBody:  htmlBody,
+		To:        to,
+		Cc:        cc,
+		ReplyTo:   replyTo,
 	}, nil
 }
 

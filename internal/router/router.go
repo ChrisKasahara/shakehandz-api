@@ -3,11 +3,12 @@ package router
 
 import (
 	"shakehandz-api/internal/auth"
+	"shakehandz-api/internal/gemini"
 	"shakehandz-api/internal/gmail"
 	"shakehandz-api/internal/humanresource"
 	"shakehandz-api/internal/project"
 	config "shakehandz-api/internal/shared"
-	gf "shakehandz-api/internal/shared/mail/gmail"
+	gmailMsgFetcher "shakehandz-api/internal/shared/message/gmail"
 	"time"
 
 	"github.com/gin-contrib/cors"
@@ -29,9 +30,12 @@ func SetupRouter() *gin.Engine {
 
 	db := config.InitDB()
 
-	// Gmail
-	fetcher := gf.New()
-	r.GET("/api/gmail/sync", gmail.NewSyncHandler(fetcher))
+	// GmailのAPIクライアント初期化実行
+	fetcher := gmailMsgFetcher.New()
+	svc := gemini.NewMessageFetcherWithGemini(fetcher)
+
+	r.GET("/api/gmail/messages", gmail.NewGmailHandler(fetcher))
+	r.GET("/api/gemini/human-resource", gemini.NewExtractDataFromMessageWithGemini(svc))
 	// gemini/gmailの他ルーティングもfetcherを使う場合は同様に修正
 
 	// HumanResource

@@ -1,4 +1,4 @@
-package gmailfetcher
+package message_gmail
 
 import (
 	"context"

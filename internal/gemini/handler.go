@@ -1,4 +1,4 @@
-package gmail
+package gemini
 
 import (
 	"fmt"
@@ -7,8 +7,8 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// ProcessServiceをDI
-func NewProcessHandler(svc *ProcessService) gin.HandlerFunc {
+// MessageFetcherをDI
+func NewExtractDataFromMessageWithGemini(svc *GmailMessageFetcher) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		ctx := c.Request.Context()
 
@@ -25,7 +25,7 @@ func NewProcessHandler(svc *ProcessService) gin.HandlerFunc {
 			return
 		}
 
-		n, err := svc.Run(ctx, accessToken)
+		n, err := svc.Fetch(ctx, accessToken)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to process mails"})
 			return
