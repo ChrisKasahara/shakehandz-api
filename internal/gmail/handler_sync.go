@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"net/http"
 
-	mail "shakehandz-api/internal/mail"
+	mail "shakehandz-api/internal/shared/mail"
 
 	"github.com/gin-gonic/gin"
 )

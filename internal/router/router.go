@@ -5,9 +5,9 @@ import (
 	"shakehandz-api/internal/auth"
 	"shakehandz-api/internal/gmail"
 	"shakehandz-api/internal/humanresource"
-	gf "shakehandz-api/internal/mail/gmail"
 	"shakehandz-api/internal/project"
 	config "shakehandz-api/internal/shared"
+	gf "shakehandz-api/internal/shared/mail/gmail"
 	"time"
 
 	"github.com/gin-contrib/cors"

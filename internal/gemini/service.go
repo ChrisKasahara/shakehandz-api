@@ -3,7 +3,7 @@ package gemini
 import (
 	"context"
 
-	mail "shakehandz-api/internal/mail"
+	mail "shakehandz-api/internal/shared/mail"
 
 	"github.com/google/generative-ai-go/genai"
 )

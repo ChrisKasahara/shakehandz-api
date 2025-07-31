@@ -9,7 +9,7 @@ import (
 	"strings"
 	"sync"
 
-	mail "shakehandz-api/internal/mail"
+	mail "shakehandz-api/internal/shared/mail"
 
 	"golang.org/x/sync/errgroup"
 	"google.golang.org/api/gmail/v1"
