@@ -1,11 +1,39 @@
 package gmail
 
 import (
+	"context"
 	"encoding/base64"
 	"strings"
 
+	"golang.org/x/oauth2"
 	"google.golang.org/api/gmail/v1"
+	"google.golang.org/api/option"
 )
+
+// Fetcher 実装
+type fetcher struct{}
+
+func NewFetcher() Fetcher {
+	return &fetcher{}
+}
+
+// Fetch: Gmail API からメール一覧を取得
+// ctx, token, query, max を受け取り、[]interface{} で返す
+func (f *fetcher) FetchMessageIDList(ctx context.Context, token *oauth2.Token, query string, max int) ([]interface{}, error) {
+	srv, err := gmail.NewService(ctx, option.WithTokenSource(oauth2.StaticTokenSource(token)))
+	if err != nil {
+		return nil, err
+	}
+	msgsList, err := srv.Users.Messages.List("me").MaxResults(int64(max)).Q(query).Do()
+	if err != nil {
+		return nil, err
+	}
+	var result []interface{}
+	for _, m := range msgsList.Messages {
+		result = append(result, m)
+	}
+	return result, nil
+}
 
 func ExtractPlainText(payload *gmail.MessagePart) string {
 	if payload == nil {
