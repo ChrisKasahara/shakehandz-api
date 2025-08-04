@@ -7,36 +7,24 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// MessageFetcherをDI
-func NewExtractDataFromMessageWithGemini(svc *GmailMessageFetcher) gin.HandlerFunc {
+// Geminiサービス呼び出し用ハンドラ
+func NewStructureWithGeminiHandler(svc *Service) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		ctx := c.Request.Context()
 
-		// Authorization ヘッダーから Bearer トークン取得
-		authHeader := c.GetHeader("Authorization")
-		if authHeader == "" {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "Authorization header missing"})
-			return
-		}
+		// Bearer トークン抽出
 		var accessToken string
-		_, err := fmt.Sscanf(authHeader, "Bearer %s", &accessToken)
-		if err != nil || accessToken == "" {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid Authorization header"})
+		if _, err := fmt.Sscanf(c.GetHeader("Authorization"), "Bearer %s", &accessToken); err != nil || accessToken == "" {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid or missing token"})
 			return
 		}
 
-		n, err := svc.Fetch(ctx, accessToken)
+		msgs, err := svc.Run(ctx, accessToken)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to process mails"})
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
 		}
 
-		// TODO: ここで取得したメールを解析キューに積む処理を実装予定
-		//       解析ロジック・Gemini呼び出しは未実装
-
-		c.JSON(http.StatusAccepted, gin.H{
-			"queued": true,
-			"count":  n,
-		})
+		c.JSON(http.StatusOK, msgs)
 	}
 }

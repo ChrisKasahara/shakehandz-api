@@ -2,6 +2,8 @@
 package router
 
 import (
+	"context"
+	"os"
 	"shakehandz-api/internal/auth"
 	"shakehandz-api/internal/gemini"
 	"shakehandz-api/internal/gmail"
@@ -32,10 +34,14 @@ func SetupRouter() *gin.Engine {
 
 	// GmailのAPIクライアント初期化実行
 	fetcher := gmailMsgFetcher.New()
-	svc := gemini.NewMessageFetcherWithGemini(fetcher)
+
+	// Gemini Client/Service DI
+	ctx := context.Background()
+	geminiCl, _ := gemini.NewClient(ctx, os.Getenv("GEMINI_API_KEY"), "models/gemini-2.5-flash")
+	geminiService := gemini.NewService(fetcher, geminiCl)
 
 	r.GET("/api/gmail/messages", gmail.NewGmailHandler(fetcher))
-	r.GET("/api/gemini/human-resource", gemini.NewExtractDataFromMessageWithGemini(svc))
+	r.POST("/api/gemini/structure-resources", gemini.NewStructureWithGeminiHandler(geminiService))
 	// gemini/gmailの他ルーティングもfetcherを使う場合は同様に修正
 
 	// HumanResource

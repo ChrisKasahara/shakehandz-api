@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/base64"
 	"errors"
+	"fmt"
 	"log"
 	"sort"
 	"strings"
@@ -12,6 +13,7 @@ import (
 	msg "shakehandz-api/internal/shared/message"
 
 	"golang.org/x/sync/errgroup"
+	"golang.org/x/sync/semaphore"
 	"google.golang.org/api/gmail/v1"
 )
 
@@ -51,13 +53,22 @@ func (fetcher *fetcher) Fetch(ctx context.Context, token, query string, max int6
 		return []*msg.Message{}, nil
 	}
 
-	g := new(errgroup.Group)
+	g, ctx := errgroup.WithContext(ctx) // コンテキスト付きのerrgroupを使用
 	var mu sync.Mutex
 	var result []*msg.Message
 
+	// 同時に実行するリクエスト数を10に制限
+	sem := semaphore.NewWeighted(10)
+
 	for _, m := range msgsList.Messages {
 		mid := m.Id
+		if err := sem.Acquire(ctx, 1); err != nil {
+			log.Printf("Failed to acquire semaphore: %v", err)
+			break
+		}
 		g.Go(func() error {
+			defer sem.Release(1)
+
 			msg, err := srv.Users.Messages.Get("me", mid).Format("full").Do()
 			if err != nil {
 				return err
@@ -102,27 +113,38 @@ func parseMessage(gmsg *gmail.Message) (*msg.Message, error) {
 			to = h.Value
 		case "Cc":
 			cc = h.Value
-		case "Reply-To": // 返信先
+		case "Reply-To":
 			replyTo = h.Value
 		}
 	}
-	plainBody := ExtractPlainText(gmsg.Payload)
-	htmlBody := "" // 必要ならHTML抽出ロジック追加
+	// 2. 本文の抽出 (プレーンテキストとHTMLの両方)
+	plainBody := ExtractBody(gmsg.Payload, "text/plain")
+	htmlBody := ExtractBody(gmsg.Payload, "text/html")
+
+	var msgAttachments []msg.Attachment
+	for _, att := range ExtractAttachments(gmsg.Payload) {
+		msgAttachments = append(msgAttachments, msg.Attachment{
+			Filename:     att.Filename,
+			Size:         att.Size,
+			AttachmentID: att.AttachmentID,
+		})
+	}
 	return &msg.Message{
-		Id:        gmsg.Id,
-		Subject:   subject,
-		From:      from,
-		Date:      date,
-		PlainBody: plainBody,
-		HtmlBody:  htmlBody,
-		To:        to,
-		Cc:        cc,
-		ReplyTo:   replyTo,
+		Id:          gmsg.Id,
+		Subject:     subject,
+		From:        from,
+		Date:        date,
+		PlainBody:   plainBody,
+		HtmlBody:    htmlBody,
+		To:          to,
+		Cc:          cc,
+		ReplyTo:     replyTo,
+		Attachments: msgAttachments,
 	}, nil
 }
 
 // 添付ファイル抽出
-func extractAttachments(payload *gmail.MessagePart) []Attachment {
+func ExtractAttachments(payload *gmail.MessagePart) []Attachment {
 	var atts []Attachment
 	if payload == nil {
 		return atts
@@ -135,25 +157,30 @@ func extractAttachments(payload *gmail.MessagePart) []Attachment {
 		})
 	}
 	for _, part := range payload.Parts {
-		atts = append(atts, extractAttachments(part)...)
+		atts = append(atts, ExtractAttachments(part)...)
 	}
 	return atts
 }
 
-// 本文抽出（text/plain優先）
-func ExtractPlainText(payload *gmail.MessagePart) string {
-	if payload == nil {
-		return ""
-	}
-	if payload.MimeType == "text/plain" && payload.Body != nil && payload.Body.Data != "" {
-		return DecodeBase64URL(payload.Body.Data)
-	}
-	for _, part := range payload.Parts {
-		result := ExtractPlainText(part)
-		if result != "" {
-			return result
+// ExtractBody は、指定されたMIMEタイプの本文を再帰的に探し、デコードして返します。
+func ExtractBody(part *gmail.MessagePart, mimeType string) string {
+	fmt.Printf("Extracting body for MIME type: %s\n", mimeType)
+	fmt.Printf("Part: %#v\n", part)
+	if part.MimeType == mimeType && part.Body != nil && part.Body.Data != "" {
+		data, err := base64.URLEncoding.DecodeString(part.Body.Data)
+		if err == nil {
+			return string(data)
 		}
 	}
+
+	if strings.HasPrefix(part.MimeType, "multipart/") {
+		for _, p := range part.Parts {
+			if body := ExtractBody(p, mimeType); body != "" {
+				return body
+			}
+		}
+	}
+
 	return ""
 }
 
