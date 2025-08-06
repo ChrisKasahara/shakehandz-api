@@ -10,7 +10,6 @@ import (
 // Geminiサービス呼び出し用ハンドラ
 func NewStructureWithGeminiHandler(svc *Service) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		ctx := c.Request.Context()
 
 		// Bearer トークン抽出
 		var accessToken string
@@ -19,7 +18,7 @@ func NewStructureWithGeminiHandler(svc *Service) gin.HandlerFunc {
 			return
 		}
 
-		msgs, err := svc.Run(ctx, accessToken)
+		msgs, err := svc.Run(c, accessToken)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return

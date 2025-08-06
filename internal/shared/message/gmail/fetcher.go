@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/base64"
 	"errors"
-	"fmt"
 	"log"
 	"sort"
 	"strings"
@@ -164,8 +163,8 @@ func ExtractAttachments(payload *gmail.MessagePart) []Attachment {
 
 // ExtractBody は、指定されたMIMEタイプの本文を再帰的に探し、デコードして返します。
 func ExtractBody(part *gmail.MessagePart, mimeType string) string {
-	fmt.Printf("Extracting body for MIME type: %s\n", mimeType)
-	fmt.Printf("Part: %#v\n", part)
+	// fmt.Printf("Extracting body for MIME type: %s\n", mimeType)
+	// fmt.Printf("Part: %#v\n", part)
 	if part.MimeType == mimeType && part.Body != nil && part.Body.Data != "" {
 		data, err := base64.URLEncoding.DecodeString(part.Body.Data)
 		if err == nil {
