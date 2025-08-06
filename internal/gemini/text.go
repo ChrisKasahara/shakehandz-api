@@ -28,3 +28,10 @@ func ExtractText(resp *genai.GenerateContentResponse) (text string, ok bool) {
 	}
 	return sb.String(), true
 }
+
+func TrimPrefixAndSuffixGeminiResponse(target string) string {
+	cleaned := strings.TrimPrefix(target, "```json\n")
+	cleaned = strings.TrimSuffix(cleaned, "```")
+
+	return cleaned
+}

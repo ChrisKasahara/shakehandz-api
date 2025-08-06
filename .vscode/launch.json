@@ -1,15 +1,36 @@
 {
-  // IntelliSense を使用して利用可能な属性を学べます。
-  // 既存の属性の説明をホバーして表示します。
-  // 詳細情報は次を確認してください: https://go.microsoft.com/fwlink/?linkid=830387
   "version": "0.2.0",
   "configurations": [
     {
-      "name": "Launch Package",
+      "name": "Go: Launch cmd/server",
       "type": "go",
       "request": "launch",
       "mode": "auto",
-      "program": "${workspaceFolder}/cmd/server"
+      "program": "${workspaceFolder}/cmd/server",
+      "cwd": "${workspaceFolder}",
+      "envFile": "${workspaceFolder}/.env"
+    },
+    {
+      "name": "Go: Debug current file",
+      "type": "go",
+      "request": "launch",
+      "mode": "auto",
+      "program": "${fileDirname}",
+      "cwd": "${workspaceFolder}"
+    },
+    {
+      "name": "Go: Test package",
+      "type": "go",
+      "request": "launch",
+      "mode": "test",
+      "program": "${workspaceFolder}",
+      "cwd": "${workspaceFolder}"
+    },
+    {
+      "name": "Go: Attach to process (pick)",
+      "type": "go",
+      "request": "attach",
+      "processId": "${command:pickProcess}"
     }
   ]
 }
