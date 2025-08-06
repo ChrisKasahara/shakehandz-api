@@ -15,6 +15,7 @@
 ▼出力スキーマ（配列要素）
 
 {
+"message_id": null,
 "attachment_type": null,
 "attachment_filename": null,
 "email_received_at": null,
@@ -45,6 +46,7 @@
 }
 
 ## 1. 抽出ルール
+- **message_id** : データ(Gmailデータ)のIdをそのまま設定(編集厳禁)
 - **attachment_type** : 添付ファイル拡張子（小文字, 例 `"pdf"`）
 - **attachment_filename** : 添付ファイル名（拡張子含む）
 - **email_received_at** : ヘッダー `Date:` を YYYY‑MM‑DD に変換。無ければ null
@@ -132,6 +134,8 @@ Attachment: resume.PDF
 
 ▼Expected JSON 配列
 [{
+
+"message_id": "0000efxxcbc000a5,
   "attachment_type": "pdf",
   "attachment_filename": "resume.PDF",
   "email_received_at": "2025-07-30",

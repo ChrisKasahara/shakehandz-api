@@ -38,7 +38,7 @@ func SetupRouter() *gin.Engine {
 	// Gemini Client/Service DI
 	ctx := context.Background()
 	geminiCl, _ := gemini.NewClient(ctx, os.Getenv("GEMINI_API_KEY"), "models/gemini-2.5-flash")
-	geminiService := gemini.NewService(fetcher, geminiCl)
+	geminiService := gemini.NewService(fetcher, geminiCl, db)
 
 	r.GET("/api/gmail/messages", gmail.NewGmailHandler(fetcher))
 	r.POST("/api/gemini/structure-resources", gemini.NewStructureWithGeminiHandler(geminiService))

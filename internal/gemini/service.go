@@ -11,16 +11,18 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/generative-ai-go/genai"
+	"gorm.io/gorm"
 )
 
 // 　Gmailメッセージ取得→Gemini解析→（将来）DB保存
 type Service struct {
 	Fetcher msg.MessageFetcher
 	Gemini  *Client
+	DB      *gorm.DB
 }
 
-func NewService(f msg.MessageFetcher, g *Client) *Service {
-	return &Service{Fetcher: f, Gemini: g}
+func NewService(f msg.MessageFetcher, g *Client, db *gorm.DB) *Service {
+	return &Service{Fetcher: f, Gemini: g, DB: db}
 }
 
 func (s *Service) Run(c *gin.Context, token string) ([]humanresource.HumanResource, error) {
@@ -54,6 +56,7 @@ func (s *Service) Run(c *gin.Context, token string) ([]humanresource.HumanResour
 	// Geminiから「ready」が返ってきたことを確認
 	fmt.Println("Geminiは準備を終えているようです。続いて変換処理を行います。")
 
+	var humanResources []humanresource.HumanResource
 	// 最初のチャンクをGeminiに送信
 	if len(chunkedMsgs) > 0 {
 		structuredResp, err := chat.SendMessage(ctx, genai.Text(chunkedMsgs[0]))
@@ -67,14 +70,17 @@ func (s *Service) Run(c *gin.Context, token string) ([]humanresource.HumanResour
 
 		trimmedResponse := TrimPrefixAndSuffixGeminiResponse(structuredRespStr)
 
-		humanResources := []humanresource.HumanResource{}
+		humanResources = []humanresource.HumanResource{}
 
 		if err := json.Unmarshal([]byte(trimmedResponse), &humanResources); err != nil {
 			return nil, err
 		}
-
-		return humanResources, nil
 	}
-
-	return nil, nil
+	// DB保存処理
+	if len(humanResources) > 0 {
+		if err := s.DB.Create(&humanResources).Error; err != nil {
+			return nil, fmt.Errorf("DB保存失敗: %w", err)
+		}
+	}
+	return humanResources, nil
 }
