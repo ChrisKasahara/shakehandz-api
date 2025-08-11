@@ -2,6 +2,7 @@ package auth
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"os"
 	"strings"
@@ -20,6 +21,7 @@ func NewGoogleLoginHandler(db *gorm.DB) *GoogleLoginHandler {
 }
 
 func (h *GoogleLoginHandler) GoogleLogin(c *gin.Context) {
+	fmt.Println("Google Login Handler called")
 	authHeader := c.GetHeader("Authorization")
 	if !strings.HasPrefix(authHeader, "Bearer ") {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Authorization header missing or invalid"})

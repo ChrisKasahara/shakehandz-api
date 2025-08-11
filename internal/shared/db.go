@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"shakehandz-api/internal/auth"
 	"shakehandz-api/internal/humanresource"
 	"shakehandz-api/internal/project"
 
@@ -30,7 +31,7 @@ func InitDB() *gorm.DB {
 		log.Fatal("DB接続失敗:", err)
 	}
 
-	if err := db.AutoMigrate(&project.Project{}, &humanresource.HumanResource{}); err != nil {
+	if err := db.AutoMigrate(&project.Project{}, &humanresource.HumanResource{}, &auth.User{}, &auth.OAuthToken{}); err != nil {
 		log.Fatal("マイグレーション失敗:", err)
 	}
 

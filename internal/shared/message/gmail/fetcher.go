@@ -38,6 +38,16 @@ func (fetcher *fetcher) FetchMsg(ctx context.Context, token, query string, max i
 	return fetcher.Fetch(ctx, token, query, max)
 }
 
+func (fetcher *fetcher) FetchMsgWithPaging(ctx context.Context, token, query string, pageSize int64, pageToken string) ([]*msg.Message, string, error) {
+	if token == "" {
+		return nil, "", errors.New("token is required")
+	}
+	if pageSize <= 0 {
+		pageSize = 50 // デフォルト値
+	}
+	return fetcher.FetchWithPaging(ctx, token, query, pageSize, pageToken)
+}
+
 // Fetch: メッセージID一覧取得→詳細取得→DTO化
 func (fetcher *fetcher) Fetch(ctx context.Context, token, query string, max int64) ([]*msg.Message, error) {
 	srv, err := NewService(ctx, token)
@@ -52,6 +62,40 @@ func (fetcher *fetcher) Fetch(ctx context.Context, token, query string, max int6
 		return []*msg.Message{}, nil
 	}
 
+	return fetcher.fetchMessageDetails(ctx, srv, msgsList.Messages)
+}
+
+// FetchWithPaging: ページング対応のメッセージ取得
+func (fetcher *fetcher) FetchWithPaging(ctx context.Context, token, query string, pageSize int64, pageToken string) ([]*msg.Message, string, error) {
+	srv, err := NewService(ctx, token)
+	if err != nil {
+		return nil, "", err
+	}
+
+	listCall := srv.Users.Messages.List("me").MaxResults(pageSize).Q(query)
+	if pageToken != "" {
+		listCall = listCall.PageToken(pageToken)
+	}
+
+	msgsList, err := listCall.Do()
+	if err != nil {
+		return nil, "", err
+	}
+
+	if len(msgsList.Messages) == 0 {
+		return []*msg.Message{}, msgsList.NextPageToken, nil
+	}
+
+	result, err := fetcher.fetchMessageDetails(ctx, srv, msgsList.Messages)
+	if err != nil {
+		return nil, "", err
+	}
+
+	return result, msgsList.NextPageToken, nil
+}
+
+// fetchMessageDetails: メッセージ詳細の並列取得処理
+func (fetcher *fetcher) fetchMessageDetails(ctx context.Context, srv *gmail.Service, messages []*gmail.Message) ([]*msg.Message, error) {
 	g, ctx := errgroup.WithContext(ctx) // コンテキスト付きのerrgroupを使用
 	var mu sync.Mutex
 	var result []*msg.Message
@@ -59,7 +103,7 @@ func (fetcher *fetcher) Fetch(ctx context.Context, token, query string, max int6
 	// 同時に実行するリクエスト数を10に制限
 	sem := semaphore.NewWeighted(10)
 
-	for _, m := range msgsList.Messages {
+	for _, m := range messages {
 		mid := m.Id
 		if err := sem.Acquire(ctx, 1); err != nil {
 			log.Printf("Failed to acquire semaphore: %v", err)

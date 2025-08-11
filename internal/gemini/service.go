@@ -32,43 +32,41 @@ func NewService(f msg.MessageFetcher, g *Client, db *gorm.DB) *Service {
 func (s *Service) Run(c *gin.Context, token string) ([]humanresource.HumanResource, error) {
 	ctx := c.Request.Context()
 	fmt.Println("NegoはGmailを取得中")
-	msgs, err := s.Fetcher.FetchMsg(ctx, token, "has:attachment", 10)
+
+	// DB既存のメッセージIDを除外した未処理メッセージを最大N件取得
+	msgs, err := s.fetchUnprocessedMessages(ctx, token, 20)
 	if err != nil {
 		return nil, err
+	}
+
+	// 未処理メッセージがない場合は空の結果を返す
+	if len(msgs) == 0 {
+		fmt.Println("最新のメールはすべて処理済みです")
+		return []humanresource.HumanResource{}, nil
 	}
 
 	fmt.Println("Gmail取得を完了。今回の解析件数は", len(msgs), "件です。Negoにプロンプトを送信中")
 
 	// chunkArrayで分割（JSON文字列の配列として）
-	chunkedMsgs := chunkArray(msgs, 3)
+	chunkedMsgs := chunkArray(msgs, 5)
 
-	chat := s.Gemini.Model.StartChat()
-
-	readyResp, err := chat.SendMessage(ctx, genai.Text(prompts.HRInstruction))
-
-	// Geminiに変換用の指示プロンプトを記憶させる
-	readyStr, ok := ExtractText(readyResp)
-	if err != nil {
-		log.Printf("Gemini API 呼び出し失敗: %v", err)
-		c.JSON(500, gin.H{"error": "Gemini API 呼び出し失敗"})
-		return nil, fmt.Errorf("Gemini API 呼び出し失敗")
+	// 共有モデルの浅いコピーを作成してSystemInstructionを一度だけ設定
+	localModel := *s.Gemini.Model
+	localModel.SystemInstruction = &genai.Content{
+		Role:  "system",
+		Parts: []genai.Part{genai.Text(prompts.HRInstruction)},
 	}
-
-	if !ok || strings.ToLower(strings.TrimSpace(readyStr)) != "ready" {
-		c.JSON(500, gin.H{"error": "'ready' が返ってきませんでした"})
-		return nil, fmt.Errorf("geminiからの取得メッセージ: %s", readyStr)
-	}
-
-	// Geminiから「ready」が返ってきたことを確認
-	fmt.Println("Nego「I'm ", readyStr, "!」。Negoは準備完了。続いて変換処理へ移行")
+	fmt.Println("Negoは準備完了。続いて変換処理へ移行")
 
 	g, ctx := errgroup.WithContext(ctx)
 	var mu sync.Mutex
-	sem := semaphore.NewWeighted(10)
+	sem := semaphore.NewWeighted(5)
 	var humanResources []humanresource.HumanResource
-	// 最初のチャンクをGeminiに送信
+
+	// SystemInstruction設定済みのローカルモデルを各ゴルーチンで使用
 	for _, cmsg := range chunkedMsgs {
-		if len(cmsg) == 0 {
+		chunk := cmsg // range変数のクロージャ捕捉対策
+		if len(chunk) == 0 {
 			continue
 		}
 
@@ -79,15 +77,22 @@ func (s *Service) Run(c *gin.Context, token string) ([]humanresource.HumanResour
 		g.Go(func() error {
 			defer sem.Release(1)
 
-			geminiResponse, geminiResErr := chat.SendMessage(ctx, genai.Text(cmsg))
-			geminiResponsePart, ok := ExtractText(geminiResponse)
+			// 事前設定されたローカルモデルでGenerateContentを呼び出し
+			geminiResponse, geminiResErr := localModel.GenerateContent(ctx, genai.Text(chunk))
 			if geminiResErr != nil {
-				log.Printf("Gemini レスポンスデータ不正: %v", geminiResErr)
-				return nil
+				log.Printf("Gemini API 呼び出し失敗: %v", geminiResErr)
+				return fmt.Errorf("Gemini API 呼び出し失敗: %w", geminiResErr)
 			}
+
+			if geminiResponse == nil {
+				log.Printf("Gemini レスポンスが nil です")
+				return fmt.Errorf("Gemini レスポンスが nil です")
+			}
+
+			geminiResponsePart, ok := ExtractText(geminiResponse)
 			if !ok {
 				log.Printf("Gemini レスポンスデータの文字列変換不正: %v", geminiResponsePart)
-				return nil
+				return fmt.Errorf("Gemini レスポンスデータの文字列変換不正: %s", geminiResponsePart)
 			}
 
 			trimmedResponse := TrimPrefixAndSuffixGeminiResponse(geminiResponsePart)
@@ -95,7 +100,8 @@ func (s *Service) Run(c *gin.Context, token string) ([]humanresource.HumanResour
 			ChunkHumanResources := []humanresource.HumanResource{}
 
 			if err := json.Unmarshal([]byte(trimmedResponse), &ChunkHumanResources); err != nil {
-				return nil
+				log.Printf("JSON Unmarshal失敗: %v", err)
+				return fmt.Errorf("JSON Unmarshal失敗: %w", err)
 			}
 
 			for _, hr := range ChunkHumanResources {
@@ -105,18 +111,36 @@ func (s *Service) Run(c *gin.Context, token string) ([]humanresource.HumanResour
 			}
 
 			return nil
-
 		})
-
 	}
+
 	if err := g.Wait(); err != nil {
 		log.Printf("fetcher: detail fetch error: %v", err)
 		return nil, err
 	}
 
+	// 念の為、MessageIDの重複を除外
+	seen := make(map[string]struct{}, len(humanResources))
+	uniq := make([]humanresource.HumanResource, 0, len(humanResources))
+
+	for _, hr := range humanResources {
+		mid := strings.TrimSpace(hr.MessageID)
+		if mid == "" {
+			uniq = append(uniq, hr)
+			continue
+		}
+		if _, ok := seen[mid]; ok {
+			continue
+		}
+		seen[mid] = struct{}{}
+		uniq = append(uniq, hr)
+	}
+
+	humanResources = uniq
+
 	fmt.Println("Negoは全ての変換を完了しました。総件数：", len(humanResources), "件です。最後の整形を行なっています")
 
-	// 日付降順
+	// 日付で降順
 	sort.Slice(humanResources, func(i, j int) bool {
 		return humanResources[i].CreatedAt.Unix() > humanResources[j].CreatedAt.Unix()
 	})
