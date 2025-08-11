@@ -1,14 +1,19 @@
 package gemini
 
 import (
-	"context"
 	"fmt"
+	"net/http"
+	"strings"
 
+	"shakehandz-api/internal/auth"
 	"shakehandz-api/internal/humanresource"
 	msg "shakehandz-api/internal/shared/message"
+
+	"github.com/gin-gonic/gin"
+	"gorm.io/gorm"
 )
 
-func (s *Service) fetchUnprocessedMessages(ctx context.Context, token string, target int) ([]*msg.Message, error) {
+func (s *Service) fetchUnprocessedMessages(c *gin.Context, token string, target int, db *gorm.DB) ([]*msg.Message, error) {
 	const pageSize = 50
 	const maxPages = 10
 
@@ -17,12 +22,40 @@ func (s *Service) fetchUnprocessedMessages(ctx context.Context, token string, ta
 	pageToken := ""
 	pageCount := 0
 
+	ctx := c.Request.Context()
+
 	for len(candidates) < target && pageCount < maxPages {
 		pageCount++
 		fmt.Printf("ページ %d/%d を処理中...\n", pageCount, maxPages)
 
+		// 1) Authorization: Bearer <id_token>
+		authz := c.GetHeader("Authorization")
+		if !strings.HasPrefix(authz, "Bearer ") {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "missing id_token"})
+			return nil, fmt.Errorf("missing id_token in Authorization header")
+		}
+		idToken := strings.TrimPrefix(authz, "Bearer ")
+
+		// 2) id_token → User
+		user, err := auth.UserFromIDToken(ctx, db, idToken)
+		if err != nil || user == nil {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid id_token"})
+			return nil, fmt.Errorf("invalid id_token: %w", err)
+		}
+
+		// 3) DBから暗号化refresh_token（[]byte）取得
+		enc, err := auth.FindGoogleRefreshTokenEncByUserID(db, user.ID.String())
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "db error"})
+			return nil, fmt.Errorf("db error: %w", err)
+		}
+		if len(enc) == 0 {
+			c.JSON(http.StatusForbidden, gin.H{"error": "no_refresh_token", "reauthorize": true})
+			return nil, fmt.Errorf("no_refresh_token: %w", err)
+		}
+
 		// ページング対応でメッセージを取得
-		msgs, nextPageToken, err := s.Fetcher.FetchMsgWithPaging(ctx, token, "has:attachment", pageSize, pageToken)
+		msgs, nextPageToken, err := s.Fetcher.FetchMsgWithPaging(ctx, enc, "has:attachment", pageSize, pageToken)
 		if err != nil {
 			return nil, fmt.Errorf("Gmail API 呼び出し失敗: %w", err)
 		}

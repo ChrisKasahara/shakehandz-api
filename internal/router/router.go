@@ -24,7 +24,7 @@ func SetupRouter() *gin.Engine {
 	r.Use(cors.New(cors.Config{
 		AllowOrigins:     []string{"http://localhost:3000"},
 		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
-		AllowHeaders:     []string{"Origin", "Content-Type", "Authorization"},
+		AllowHeaders:     []string{"Origin", "Content-Type", "Authorization", "X-App-Auth"},
 		ExposeHeaders:    []string{"Content-Length"},
 		AllowCredentials: true,
 		MaxAge:           12 * time.Hour,
@@ -40,7 +40,7 @@ func SetupRouter() *gin.Engine {
 	geminiCl, _ := gemini.NewClient(ctx, os.Getenv("GEMINI_API_KEY"), "models/gemini-2.5-flash")
 	geminiService := gemini.NewService(fetcher, geminiCl, db)
 
-	r.GET("/api/gmail/messages", gmail.NewGmailHandler(fetcher))
+	r.GET("/api/gmail/messages", gmail.NewGmailHandler(fetcher, db))
 	r.POST("/api/gemini/structure-resources", gemini.NewStructureWithGeminiHandler(geminiService))
 	// gemini/gmailの他ルーティングもfetcherを使う場合は同様に修正
 
@@ -57,6 +57,8 @@ func SetupRouter() *gin.Engine {
 	// Auth
 	authHandler := auth.NewGoogleLoginHandler(db)
 	r.POST("/api/auth/google-login", authHandler.GoogleLogin)
+	consentHandler := auth.NewGoogleConsentHandler(db)
+	r.POST("/api/auth/google-consent", auth.RequireInternalCall(), consentHandler.SaveRefreshToken)
 
 	return r
 }

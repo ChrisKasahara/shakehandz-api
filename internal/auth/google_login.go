@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 	"google.golang.org/api/idtoken"
 	"gorm.io/gorm"
 )
@@ -41,6 +42,7 @@ func (h *GoogleLoginHandler) GoogleLogin(c *gin.Context) {
 	picture, _ := payload.Claims["picture"].(string)
 
 	user := User{
+		ID:       uuid.New(),
 		GoogleID: sub,
 		Email:    email,
 		Name:     name,

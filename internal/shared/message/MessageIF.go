@@ -22,6 +22,6 @@ type Attachment struct {
 }
 
 type MessageFetcher interface {
-	FetchMsg(ctx context.Context, token, query string, max int64) ([]*Message, error)
-	FetchMsgWithPaging(ctx context.Context, token, query string, pageSize int64, pageToken string) ([]*Message, string, error)
+	FetchMsg(ctx context.Context, encRefresh []byte, query string, max int64) ([]*Message, error)
+	FetchMsgWithPaging(ctx context.Context, encRefresh []byte, query string, pageSize int64, pageToken string) ([]*Message, string, error)
 }

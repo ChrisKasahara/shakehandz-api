@@ -34,7 +34,7 @@ func (s *Service) Run(c *gin.Context, token string) ([]humanresource.HumanResour
 	fmt.Println("NegoはGmailを取得中")
 
 	// DB既存のメッセージIDを除外した未処理メッセージを最大N件取得
-	msgs, err := s.fetchUnprocessedMessages(ctx, token, 20)
+	msgs, err := s.fetchUnprocessedMessages(c, token, 20, s.DB)
 	if err != nil {
 		return nil, err
 	}

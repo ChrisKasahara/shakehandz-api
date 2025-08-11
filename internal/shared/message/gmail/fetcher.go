@@ -28,29 +28,31 @@ func New() msg.MessageFetcher {
 	return &fetcher{}
 }
 
-func (fetcher *fetcher) FetchMsg(ctx context.Context, token, query string, max int64) ([]*msg.Message, error) {
-	if token == "" {
-		return nil, errors.New("token is required")
+// FetchMsg: メッセージID一覧取得→詳細取得→DTO化（refresh対応）
+func (fetcher *fetcher) FetchMsg(ctx context.Context, encRefresh []byte, query string, max int64) ([]*msg.Message, error) {
+	if len(encRefresh) == 0 {
+		return nil, errors.New("refresh token is required")
 	}
 	if max <= 0 {
 		max = 10 // デフォルト値
 	}
-	return fetcher.Fetch(ctx, token, query, max)
+	return fetcher.Fetch(ctx, encRefresh, query, max)
 }
 
-func (fetcher *fetcher) FetchMsgWithPaging(ctx context.Context, token, query string, pageSize int64, pageToken string) ([]*msg.Message, string, error) {
-	if token == "" {
-		return nil, "", errors.New("token is required")
+// FetchMsgWithPaging: ページング対応のメッセージ取得（refresh対応）
+func (fetcher *fetcher) FetchMsgWithPaging(ctx context.Context, encRefresh []byte, query string, pageSize int64, pageToken string) ([]*msg.Message, string, error) {
+	if len(encRefresh) == 0 {
+		return nil, "", errors.New("refresh token is required")
 	}
 	if pageSize <= 0 {
 		pageSize = 50 // デフォルト値
 	}
-	return fetcher.FetchWithPaging(ctx, token, query, pageSize, pageToken)
+	return fetcher.FetchWithPaging(ctx, encRefresh, query, pageSize, pageToken)
 }
 
-// Fetch: メッセージID一覧取得→詳細取得→DTO化
-func (fetcher *fetcher) Fetch(ctx context.Context, token, query string, max int64) ([]*msg.Message, error) {
-	srv, err := NewService(ctx, token)
+// Fetch: メッセージID一覧取得→詳細取得→DTO化（refresh対応）
+func (fetcher *fetcher) Fetch(ctx context.Context, encRefresh []byte, query string, max int64) ([]*msg.Message, error) {
+	srv, err := NewServiceWithRefresh(ctx, encRefresh)
 	if err != nil {
 		return nil, err
 	}
@@ -61,13 +63,12 @@ func (fetcher *fetcher) Fetch(ctx context.Context, token, query string, max int6
 	if len(msgsList.Messages) == 0 {
 		return []*msg.Message{}, nil
 	}
-
 	return fetcher.fetchMessageDetails(ctx, srv, msgsList.Messages)
 }
 
-// FetchWithPaging: ページング対応のメッセージ取得
-func (fetcher *fetcher) FetchWithPaging(ctx context.Context, token, query string, pageSize int64, pageToken string) ([]*msg.Message, string, error) {
-	srv, err := NewService(ctx, token)
+// FetchWithPaging: ページング対応のメッセージ取得（refresh対応）
+func (fetcher *fetcher) FetchWithPaging(ctx context.Context, encRefresh []byte, query string, pageSize int64, pageToken string) ([]*msg.Message, string, error) {
+	srv, err := NewServiceWithRefresh(ctx, encRefresh)
 	if err != nil {
 		return nil, "", err
 	}
@@ -81,7 +82,6 @@ func (fetcher *fetcher) FetchWithPaging(ctx context.Context, token, query string
 	if err != nil {
 		return nil, "", err
 	}
-
 	if len(msgsList.Messages) == 0 {
 		return []*msg.Message{}, msgsList.NextPageToken, nil
 	}
@@ -90,7 +90,6 @@ func (fetcher *fetcher) FetchWithPaging(ctx context.Context, token, query string
 	if err != nil {
 		return nil, "", err
 	}
-
 	return result, msgsList.NextPageToken, nil
 }
 
