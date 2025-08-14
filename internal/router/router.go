@@ -2,15 +2,12 @@
 package router
 
 import (
-	"context"
-	"os"
 	"shakehandz-api/internal/auth"
-	"shakehandz-api/internal/gemini"
-	"shakehandz-api/internal/gmail"
+	g "shakehandz-api/internal/gmail"
 	"shakehandz-api/internal/humanresource"
 	"shakehandz-api/internal/project"
 	config "shakehandz-api/internal/shared"
-	gmailMsgFetcher "shakehandz-api/internal/shared/message/gmail"
+	gmsg "shakehandz-api/internal/shared/message/gmail"
 	"time"
 
 	"github.com/gin-contrib/cors"
@@ -32,16 +29,19 @@ func SetupRouter() *gin.Engine {
 
 	db := config.InitDB()
 
-	// GmailのAPIクライアント初期化実行
-	fetcher := gmailMsgFetcher.New()
-
 	// Gemini Client/Service DI
-	ctx := context.Background()
-	geminiCl, _ := gemini.NewClient(ctx, os.Getenv("GEMINI_API_KEY"), "models/gemini-2.5-flash")
-	geminiService := gemini.NewService(fetcher, geminiCl, db)
+	// ctx := context.Background()
+	// geminiCl, _ := gemini.NewClient(ctx, os.Getenv("GEMINI_API_KEY"), "models/gemini-2.5-flash")
+	// geminiService := gemini.NewService(fetcher, geminiCl, db)
 
-	r.GET("/api/gmail/messages", gmail.NewGmailHandler(fetcher, db))
-	r.POST("/api/gemini/structure-resources", gemini.NewStructureWithGeminiHandler(geminiService))
+	// gmailService := gmail.NewService(fetcher)
+
+	fetcher := gmsg.NewGmailMsgFetcher() // Fetcher構造体がMessageIFを実装している場合
+
+	gmailMsgFetcherSvc := g.NewGmailMsgService(fetcher)
+
+	r.GET("/api/gmail/messages", g.NewGmailHandler(gmailMsgFetcherSvc, db))
+	// r.POST("/api/gemini/structure-resources", gemini.NewStructureWithGeminiHandler(geminiService))
 	// gemini/gmailの他ルーティングもfetcherを使う場合は同様に修正
 
 	// HumanResource

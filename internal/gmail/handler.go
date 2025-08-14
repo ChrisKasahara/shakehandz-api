@@ -5,14 +5,14 @@ import (
 	"strings"
 
 	"shakehandz-api/internal/auth"
-	msg "shakehandz-api/internal/shared/message"
+	gmsg "shakehandz-api/internal/shared/message/gmail"
 
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 )
 
 // Gmail同期API: id_tokenからユーザー解決→DBのrefreshを使ってFetch
-func NewGmailHandler(f msg.MessageFetcher, db *gorm.DB) gin.HandlerFunc {
+func NewGmailHandler(svc *GmailMsgService, db *gorm.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		ctx := c.Request.Context()
 
@@ -42,13 +42,19 @@ func NewGmailHandler(f msg.MessageFetcher, db *gorm.DB) gin.HandlerFunc {
 			return
 		}
 
-		// 5) 取得（クエリや件数はそのまま）
-		msgs, err := f.FetchMsg(ctx, enc, "has:attachment", 100)
+		refresh_gmail_svc, err := gmsg.NewServiceWithRefresh(ctx, enc)
 		if err != nil {
-			// 失効や撤回が疑われる場合は再同意を促す
-			c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error(), "reauthorize": true})
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create gmail service"})
 			return
 		}
+
+		// Runでメッセージ取得
+		msgs, err := svc.Run(ctx, refresh_gmail_svc, c.Query("query"), 0)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch messages"})
+			return
+		}
+
 		c.JSON(http.StatusOK, msgs)
 	}
 }

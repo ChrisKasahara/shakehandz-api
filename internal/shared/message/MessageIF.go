@@ -1,7 +1,5 @@
 package message
 
-import "context"
-
 type Message struct {
 	Id          string       `json:"id"`
 	Subject     string       `json:"subject"`
@@ -19,9 +17,4 @@ type Attachment struct {
 	Filename     string `json:"filename"`
 	Size         int64  `json:"size"`
 	AttachmentID string `json:"attachment_id"`
-}
-
-type MessageFetcher interface {
-	FetchMsg(ctx context.Context, encRefresh []byte, query string, max int64) ([]*Message, error)
-	FetchMsgWithPaging(ctx context.Context, encRefresh []byte, query string, pageSize int64, pageToken string) ([]*Message, string, error)
 }

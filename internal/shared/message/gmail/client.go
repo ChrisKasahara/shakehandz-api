@@ -12,9 +12,6 @@ import (
 	"google.golang.org/api/option"
 )
 
-// 旧: NewService(ctx, accessToken) は1時間で失効 → 今後は未使用に
-// func NewService(ctx context.Context, token string) (*gmail.Service, error) { ... }
-
 // 保存済みの暗号化refresh_tokenからgmail.Serviceを生成（自動リフレッシュ）
 func NewServiceWithRefresh(ctx context.Context, encRefresh []byte) (*gmail.Service, error) {
 	if len(encRefresh) == 0 {
@@ -26,6 +23,9 @@ func NewServiceWithRefresh(ctx context.Context, encRefresh []byte) (*gmail.Servi
 	}
 	cfg := googleutil.OAuth2ConfigFromEnv()
 	tok := &oauth2.Token{RefreshToken: rt}
-	ts := cfg.TokenSource(ctx, tok) // ← 自動でaccess_token発行＆更新
+
+	baseTS := cfg.TokenSource(ctx, tok)
+	ts := oauth2.ReuseTokenSource(nil, baseTS) // ★ 追加
+
 	return gmail.NewService(ctx, option.WithTokenSource(ts))
 }
