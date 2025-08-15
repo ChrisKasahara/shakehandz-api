@@ -2,7 +2,6 @@ package message_gmail
 
 import (
 	"context"
-
 	msg "shakehandz-api/internal/shared/message"
 
 	"google.golang.org/api/gmail/v1"
@@ -10,7 +9,7 @@ import (
 
 type GmailMsgFetcher struct{}
 
-func NewGmailMsgFetcher() *GmailMsgFetcher {
+func NewGmailMsgFetcher() MessageIF {
 	return &GmailMsgFetcher{}
 }
 

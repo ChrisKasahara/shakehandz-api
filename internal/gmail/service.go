@@ -2,6 +2,7 @@ package gmail
 
 import (
 	"context"
+	"log"
 	msg "shakehandz-api/internal/shared/message"
 	gmsg "shakehandz-api/internal/shared/message/gmail"
 
@@ -19,7 +20,8 @@ func NewGmailMsgService(f gmsg.MessageIF) *GmailMsgService {
 // Gmailメッセージ取得
 func (s *GmailMsgService) Run(ctx context.Context, svc *gmail.Service, query string, max int64) ([]*msg.Message, error) {
 
-	idMsgs, err := s.Fetcher.FetchMsgIds(ctx, svc, query, max)
+	log.Printf("Gmailメッセージを取得中: query=%s, max=%d", query, max)
+	idMsgs, err := s.Fetcher.FetchMsg(ctx, svc, query, max)
 	if err != nil {
 		return nil, err
 	}

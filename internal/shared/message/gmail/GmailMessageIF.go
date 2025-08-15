@@ -8,8 +8,8 @@ import (
 )
 
 type MsgIDFetcherIF interface {
-	FetchMsgIds(ctx context.Context, svc *gmail.Service, query string, max int64) ([]*m.Message, error)
-	FetchMsgIdsWithPaging(ctx context.Context, svc *gmail.Service, query string, pageSize int64, pageToken string) ([]*m.Message, string, error)
+	FetchMsgIds(ctx context.Context, svc *gmail.Service, query string, max int64) ([]*gmail.Message, error)
+	FetchMsgIdsWithPaging(ctx context.Context, svc *gmail.Service, query string, pageSize int64, pageToken string) ([]*gmail.Message, string, error)
 }
 
 type MsgDetailFetcherIF interface {

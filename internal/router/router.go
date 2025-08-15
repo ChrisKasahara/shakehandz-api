@@ -36,9 +36,7 @@ func SetupRouter() *gin.Engine {
 
 	// gmailService := gmail.NewService(fetcher)
 
-	fetcher := gmsg.NewGmailMsgFetcher() // Fetcher構造体がMessageIFを実装している場合
-
-	gmailMsgFetcherSvc := g.NewGmailMsgService(fetcher)
+	gmailMsgFetcherSvc := g.NewGmailMsgService(gmsg.NewGmailMsgFetcher())
 
 	r.GET("/api/gmail/messages", g.NewGmailHandler(gmailMsgFetcherSvc, db))
 	// r.POST("/api/gemini/structure-resources", gemini.NewStructureWithGeminiHandler(geminiService))
