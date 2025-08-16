@@ -1,4 +1,4 @@
-package message
+package shared_message
 
 type Message struct {
 	Id          string       `json:"id"`

@@ -1,12 +1,10 @@
-package message_gmail
+package gmail
 
 import (
-	"context"
-
 	"google.golang.org/api/gmail/v1"
 )
 
-func (fetcher *GmailMsgFetcher) FetchMsgIds(ctx context.Context, svc *gmail.Service, query string, max int64) ([]*gmail.Message, error) {
+func (fetcher *GmailMsgFetcher) FetchMsgIds(svc *gmail.Service, query string, max int64) ([]*gmail.Message, error) {
 	if max <= 0 {
 		max = 10
 	}
@@ -21,7 +19,7 @@ func (fetcher *GmailMsgFetcher) FetchMsgIds(ctx context.Context, svc *gmail.Serv
 }
 
 // ページング版（svc使い回し）
-func (fetcher *GmailMsgFetcher) FetchMsgIdsWithPaging(ctx context.Context, svc *gmail.Service, query string, pageSize int64, pageToken string) ([]*gmail.Message, string, error) {
+func (fetcher *GmailMsgFetcher) FetchMsgIdsWithPaging(svc *gmail.Service, query string, pageSize int64, pageToken string) ([]*gmail.Message, string, error) {
 	if pageSize <= 0 {
 		pageSize = 50
 	}

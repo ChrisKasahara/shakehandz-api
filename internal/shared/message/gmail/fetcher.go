@@ -1,4 +1,4 @@
-package message_gmail
+package gmail
 
 import (
 	"context"
@@ -17,7 +17,7 @@ func (fetcher *GmailMsgFetcher) FetchMsg(ctx context.Context, svc *gmail.Service
 	if max <= 0 {
 		max = 10
 	}
-	list, err := fetcher.FetchMsgIds(ctx, svc, query, max)
+	list, err := fetcher.FetchMsgIds(svc, query, max)
 	if err != nil {
 		return nil, err
 	}
@@ -32,7 +32,7 @@ func (fetcher *GmailMsgFetcher) FetchMsgWithPaging(ctx context.Context, svc *gma
 	if pageSize <= 0 {
 		pageSize = 50
 	}
-	list, nextPageToken, err := fetcher.FetchMsgIdsWithPaging(ctx, svc, query, pageSize, pageToken)
+	list, nextPageToken, err := fetcher.FetchMsgIdsWithPaging(svc, query, pageSize, pageToken)
 	if err != nil {
 		return nil, "", err
 	}

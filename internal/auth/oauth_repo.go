@@ -7,7 +7,7 @@ import (
 )
 
 func FindGoogleRefreshTokenEncByUserID(db *gorm.DB, userID string) ([]byte, error) {
-	var rec OAuthToken
+	var rec OauthToken
 	err := db.Where("user_id = ? AND provider = ?", userID, "google").First(&rec).Error
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {

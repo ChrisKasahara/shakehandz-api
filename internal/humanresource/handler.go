@@ -15,7 +15,6 @@ func NewHumanResourcesHandler(db *gorm.DB) *HumanResourcesHandler {
 	return &HumanResourcesHandler{DB: db}
 }
 
-// GET /human_resources
 func (h *HumanResourcesHandler) GetHumanResources(c *gin.Context) {
 	var humans []HumanResource
 	if err := h.DB.Find(&humans).Error; err != nil {
@@ -25,7 +24,6 @@ func (h *HumanResourcesHandler) GetHumanResources(c *gin.Context) {
 	c.JSON(http.StatusOK, humans)
 }
 
-// GET /human_resources/:id
 func (h *HumanResourcesHandler) GetHumanResource(c *gin.Context) {
 	id := c.Param("id")
 	var human HumanResource

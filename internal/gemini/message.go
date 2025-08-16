@@ -2,21 +2,21 @@ package gemini
 
 import (
 	"fmt"
-	"net/http"
-	"strings"
 
-	"shakehandz-api/internal/auth"
 	"shakehandz-api/internal/humanresource"
 	msg "shakehandz-api/internal/shared/message"
 
 	"github.com/gin-gonic/gin"
-	"gorm.io/gorm"
+	"google.golang.org/api/gmail/v1"
 )
 
-func (s *Service) fetchUnprocessedMessages(c *gin.Context, token string, target int, db *gorm.DB) ([]*msg.Message, error) {
+func (s *Service) fetchUnprocessedMessages(c *gin.Context, gmail_svc *gmail.Service, target int) ([]*msg.Message, error) {
+	// ページング設定
 	const pageSize = 50
+	// 10ページまでめくって取得する
 	const maxPages = 10
 
+	// 解析結果を保持
 	var candidates []*msg.Message
 	seenIDs := make(map[string]bool)
 	pageToken := ""
@@ -24,38 +24,13 @@ func (s *Service) fetchUnprocessedMessages(c *gin.Context, token string, target 
 
 	ctx := c.Request.Context()
 
+	// 指定件数に達するまでページングでメッセージを取得
 	for len(candidates) < target && pageCount < maxPages {
 		pageCount++
 		fmt.Printf("ページ %d/%d を処理中...\n", pageCount, maxPages)
 
-		// 1) Authorization: Bearer <id_token>
-		authz := c.GetHeader("Authorization")
-		if !strings.HasPrefix(authz, "Bearer ") {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "missing id_token"})
-			return nil, fmt.Errorf("missing id_token in Authorization header")
-		}
-		idToken := strings.TrimPrefix(authz, "Bearer ")
-
-		// 2) id_token → User
-		user, err := auth.UserFromIDToken(ctx, db, idToken)
-		if err != nil || user == nil {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid id_token"})
-			return nil, fmt.Errorf("invalid id_token: %w", err)
-		}
-
-		// 3) DBから暗号化refresh_token（[]byte）取得
-		enc, err := auth.FindGoogleRefreshTokenEncByUserID(db, user.ID.String())
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "db error"})
-			return nil, fmt.Errorf("db error: %w", err)
-		}
-		if len(enc) == 0 {
-			c.JSON(http.StatusForbidden, gin.H{"error": "no_refresh_token", "reauthorize": true})
-			return nil, fmt.Errorf("no_refresh_token: %w", err)
-		}
-
 		// ページング対応でメッセージを取得
-		msgs, nextPageToken, err := s.Fetcher.FetchMsgWithPaging(ctx, enc, "has:attachment", pageSize, pageToken)
+		msgs, nextPageToken, err := s.Fetcher.FetchMsgWithPaging(ctx, gmail_svc, "has:attachment", pageSize, pageToken)
 		if err != nil {
 			return nil, fmt.Errorf("Gmail API 呼び出し失敗: %w", err)
 		}
@@ -104,10 +79,13 @@ func (s *Service) fetchUnprocessedMessages(c *gin.Context, token string, target 
 		for _, msg := range msgs {
 			if !existingIDMap[msg.Id] && len(candidates) < target {
 				candidates = append(candidates, msg)
+
+				// 取得件数がに達した場合でも次ページを取得した場合処理が進行してしまうので、件数に達した場合ここで処理を終了
+				if len(candidates) >= target {
+					break
+				}
 			}
 		}
-
-		fmt.Printf("未処理候補累計: %d件\n", len(candidates))
 
 		// 次ページがない場合は終了
 		pageToken = nextPageToken
@@ -125,7 +103,5 @@ func (s *Service) fetchUnprocessedMessages(c *gin.Context, token string, target 
 	if len(candidates) > target {
 		candidates = candidates[:target]
 	}
-
-	fmt.Printf("最終的な未処理メッセージ件数: %d件\n", len(candidates))
 	return candidates, nil
 }

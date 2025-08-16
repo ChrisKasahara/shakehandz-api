@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"log"
 	"shakehandz-api/internal/humanresource"
-	msg "shakehandz-api/internal/shared/message"
+	gmsg "shakehandz-api/internal/shared/message/gmail"
 	"shakehandz-api/prompts"
 	"sort"
 	"strings"
@@ -15,43 +15,43 @@ import (
 	"github.com/google/generative-ai-go/genai"
 	"golang.org/x/sync/errgroup"
 	"golang.org/x/sync/semaphore"
+	"google.golang.org/api/gmail/v1"
 	"gorm.io/gorm"
 )
 
 // 　Gmailメッセージ取得→Gemini解析→（将来）DB保存
 type Service struct {
-	Fetcher msg.MessageFetcher
-	Gemini  *Client
+	Fetcher gmsg.MessageIF
 	DB      *gorm.DB
 }
 
-func NewService(f msg.MessageFetcher, g *Client, db *gorm.DB) *Service {
-	return &Service{Fetcher: f, Gemini: g, DB: db}
+func NewGeminiService(f gmsg.MessageIF, db *gorm.DB) *Service {
+	return &Service{Fetcher: f, DB: db}
 }
 
-func (s *Service) Run(c *gin.Context, token string) ([]humanresource.HumanResource, error) {
+func (s *Service) Run(c *gin.Context, client *Client, gmail_svc *gmail.Service) (bool, error) {
 	ctx := c.Request.Context()
 	fmt.Println("NegoはGmailを取得中")
 
 	// DB既存のメッセージIDを除外した未処理メッセージを最大N件取得
-	msgs, err := s.fetchUnprocessedMessages(c, token, 20, s.DB)
+	msgs, err := s.fetchUnprocessedMessages(c, gmail_svc, 9)
 	if err != nil {
-		return nil, err
+		return false, err
 	}
 
 	// 未処理メッセージがない場合は空の結果を返す
 	if len(msgs) == 0 {
 		fmt.Println("最新のメールはすべて処理済みです")
-		return []humanresource.HumanResource{}, nil
+		return false, nil
 	}
 
 	fmt.Println("Gmail取得を完了。今回の解析件数は", len(msgs), "件です。Negoにプロンプトを送信中")
 
 	// chunkArrayで分割（JSON文字列の配列として）
-	chunkedMsgs := chunkArray(msgs, 5)
+	chunkedMsgs := chunkArray(msgs, 3)
 
 	// 共有モデルの浅いコピーを作成してSystemInstructionを一度だけ設定
-	localModel := *s.Gemini.Model
+	localModel := client.Model
 	localModel.SystemInstruction = &genai.Content{
 		Role:  "system",
 		Parts: []genai.Part{genai.Text(prompts.HRInstruction)},
@@ -71,7 +71,7 @@ func (s *Service) Run(c *gin.Context, token string) ([]humanresource.HumanResour
 		}
 
 		if err := sem.Acquire(ctx, 1); err != nil {
-			return nil, fmt.Errorf("セマフォの取得に失敗: %w", err)
+			return false, fmt.Errorf("セマフォの取得に失敗: %w", err)
 		}
 
 		g.Go(func() error {
@@ -106,6 +106,7 @@ func (s *Service) Run(c *gin.Context, token string) ([]humanresource.HumanResour
 
 			for _, hr := range ChunkHumanResources {
 				mu.Lock()
+				fmt.Println("Negoは順調に変換を進めています 進捗:", len(msgs), "/", len(humanResources)+1)
 				humanResources = append(humanResources, hr)
 				mu.Unlock()
 			}
@@ -116,7 +117,7 @@ func (s *Service) Run(c *gin.Context, token string) ([]humanresource.HumanResour
 
 	if err := g.Wait(); err != nil {
 		log.Printf("fetcher: detail fetch error: %v", err)
-		return nil, err
+		return false, err
 	}
 
 	// 念の為、MessageIDの重複を除外
@@ -149,8 +150,8 @@ func (s *Service) Run(c *gin.Context, token string) ([]humanresource.HumanResour
 	// DB保存処理
 	if len(humanResources) > 0 {
 		if err := s.DB.Create(&humanResources).Error; err != nil {
-			return nil, fmt.Errorf("DB保存失敗: %w", err)
+			return false, fmt.Errorf("DB保存失敗: %w", err)
 		}
 	}
-	return humanResources, nil
+	return true, nil
 }

@@ -1,4 +1,4 @@
-package message_gmail
+package gmail
 
 import (
 	"context"

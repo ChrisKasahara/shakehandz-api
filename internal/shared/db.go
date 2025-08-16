@@ -31,7 +31,7 @@ func InitDB() *gorm.DB {
 		log.Fatal("DB接続失敗:", err)
 	}
 
-	if err := db.AutoMigrate(&project.Project{}, &humanresource.HumanResource{}, &auth.User{}, &auth.OAuthToken{}); err != nil {
+	if err := db.AutoMigrate(&project.Project{}, &humanresource.HumanResource{}, &auth.User{}, &auth.OauthToken{}); err != nil {
 		log.Fatal("マイグレーション失敗:", err)
 	}
 

@@ -1,29 +1,39 @@
 package gemini
 
 import (
-	"fmt"
 	"net/http"
+
+	sa "shakehandz-api/internal/shared/auth"
+	"shakehandz-api/internal/shared/message/gmail"
 
 	"github.com/gin-gonic/gin"
 )
 
 // Geminiサービス呼び出し用ハンドラ
-func NewStructureWithGeminiHandler(svc *Service) gin.HandlerFunc {
+func StructureWithGeminiHandler(svc *Service) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		ctx := c.Request.Context()
 
-		// Bearer トークン抽出
-		var accessToken string
-		if _, err := fmt.Sscanf(c.GetHeader("Authorization"), "Bearer %s", &accessToken); err != nil || accessToken == "" {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid or missing token"})
-			return
-		}
-
-		msgs, err := svc.Run(c, accessToken)
+		verified, err := sa.IsUserVerified(c)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
 		}
 
-		c.JSON(http.StatusOK, msgs)
+		cli, _ := NewGeminiClientWithRefresh(ctx, "models/gemini-2.5-flash", verified.Token.RefreshToken)
+
+		gmail_svc, err := gmail.NewGmailClientWithRefresh(ctx, verified.Token.RefreshToken)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create gmail service"})
+			return
+		}
+
+		ok, err := svc.Run(c, cli, gmail_svc)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+
+		c.JSON(http.StatusOK, ok)
 	}
 }

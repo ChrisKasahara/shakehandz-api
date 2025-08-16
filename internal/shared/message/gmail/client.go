@@ -1,4 +1,4 @@
-package message_gmail
+package gmail
 
 import (
 	"context"
@@ -13,7 +13,7 @@ import (
 )
 
 // 保存済みの暗号化refresh_tokenからgmail.Serviceを生成（自動リフレッシュ）
-func NewServiceWithRefresh(ctx context.Context, encRefresh []byte) (*gmail.Service, error) {
+func NewGmailClientWithRefresh(ctx context.Context, encRefresh []byte) (*gmail.Service, error) {
 	if len(encRefresh) == 0 {
 		return nil, errors.New("empty refresh token")
 	}
@@ -25,7 +25,10 @@ func NewServiceWithRefresh(ctx context.Context, encRefresh []byte) (*gmail.Servi
 	tok := &oauth2.Token{RefreshToken: rt}
 
 	baseTS := cfg.TokenSource(ctx, tok)
-	ts := oauth2.ReuseTokenSource(nil, baseTS) // ★ 追加
+	ts := oauth2.ReuseTokenSource(nil, baseTS)
+	if ts == nil {
+		return nil, errors.New("failed to create token source")
+	}
 
 	return gmail.NewService(ctx, option.WithTokenSource(ts))
 }
