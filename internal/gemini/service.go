@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"shakehandz-api/internal/humanresource"
+	cache_ai "shakehandz-api/internal/shared/cache/ai"
 	gmsg "shakehandz-api/internal/shared/message/gmail"
 	"shakehandz-api/prompts"
 	"sort"
@@ -13,6 +14,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/generative-ai-go/genai"
+	"github.com/redis/go-redis/v9"
 	"golang.org/x/sync/errgroup"
 	"golang.org/x/sync/semaphore"
 	"google.golang.org/api/gmail/v1"
@@ -23,10 +25,11 @@ import (
 type Service struct {
 	Fetcher gmsg.MessageIF
 	DB      *gorm.DB
+	rdb     *redis.Client
 }
 
-func NewGeminiService(f gmsg.MessageIF, db *gorm.DB) *Service {
-	return &Service{Fetcher: f, DB: db}
+func NewGeminiService(f gmsg.MessageIF, db *gorm.DB, rdb *redis.Client) *Service {
+	return &Service{Fetcher: f, DB: db, rdb: rdb}
 }
 
 func (s *Service) Run(c *gin.Context, client *Client, gmail_svc *gmail.Service) (bool, error) {
@@ -57,6 +60,14 @@ func (s *Service) Run(c *gin.Context, client *Client, gmail_svc *gmail.Service) 
 		Parts: []genai.Part{genai.Text(prompts.HRInstruction)},
 	}
 	fmt.Println("Negoは準備完了。続いて変換処理へ移行")
+	progressStatus := cache_ai.JobStatus{
+		JobID:   "status",
+		Status:  "pending",
+		Message: "メール内容の構造化を学習中...",
+	}
+	if err := cache_ai.UpdateStatusInRedis(c.Request.Context(), s.rdb, progressStatus); err != nil {
+		log.Printf("ERROR: Failed to update redis: %v", err)
+	}
 
 	g, ctx := errgroup.WithContext(ctx)
 	var mu sync.Mutex
@@ -106,9 +117,16 @@ func (s *Service) Run(c *gin.Context, client *Client, gmail_svc *gmail.Service) 
 
 			for _, hr := range ChunkHumanResources {
 				mu.Lock()
-				fmt.Println("Negoは順調に変換を進めています 進捗:", len(msgs), "/", len(humanResources)+1)
 				humanResources = append(humanResources, hr)
 				mu.Unlock()
+				progressStatus = cache_ai.JobStatus{
+					JobID:   "status",
+					Status:  "processing",
+					Message: "順調に変換作業を開始しているようです！",
+				}
+				if err := cache_ai.UpdateStatusInRedis(c.Request.Context(), s.rdb, progressStatus); err != nil {
+					log.Printf("ERROR: Failed to update redis: %v", err)
+				}
 			}
 
 			return nil
@@ -152,6 +170,15 @@ func (s *Service) Run(c *gin.Context, client *Client, gmail_svc *gmail.Service) 
 		if err := s.DB.Create(&humanResources).Error; err != nil {
 			return false, fmt.Errorf("DB保存失敗: %w", err)
 		}
+	}
+
+	progressStatus = cache_ai.JobStatus{
+		JobID:   "status",
+		Status:  "completed",
+		Message: "全ての作業を終えました 🎉",
+	}
+	if err := cache_ai.UpdateStatusInRedis(c.Request.Context(), s.rdb, progressStatus); err != nil {
+		log.Printf("ERROR: Failed to update redis: %v", err)
 	}
 	return true, nil
 }

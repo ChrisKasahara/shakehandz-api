@@ -14,9 +14,10 @@ import (
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
+	"github.com/redis/go-redis/v9"
 )
 
-func SetupRouter() *gin.Engine {
+func SetupRouter(rdb *redis.Client) *gin.Engine {
 	r := gin.Default()
 
 	r.Use(cors.New(cors.Config{
@@ -33,7 +34,7 @@ func SetupRouter() *gin.Engine {
 	// DI
 	gmailMsgFetcher := gmail.NewGmailMsgFetcher()
 	gmailMsgFetcherSvc := message.NewGmailMsgService(gmailMsgFetcher)
-	geminiService := gemini.NewGeminiService(gmailMsgFetcher, db)
+	geminiService := gemini.NewGeminiService(gmailMsgFetcher, db, rdb)
 	authService := auth.NewAuthService(db)
 	hrHandler := humanresource.NewHumanResourcesHandler(db)
 	projectHandler := project.NewProjectHandler(db)
@@ -46,6 +47,7 @@ func SetupRouter() *gin.Engine {
 
 		// AI
 		protected.POST("/structure/humanresource", gemini.StructureWithGeminiHandler(geminiService))
+		protected.GET("/structure/status", gemini.GetStructureStatusHandler(rdb))
 
 		// 要員管理
 		protected.GET("/humanresource", hrHandler.GetHumanResources)

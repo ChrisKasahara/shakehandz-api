@@ -4,33 +4,26 @@ package main
 import (
 	"context"
 	"log"
-	"os"
 
-	"github.com/google/generative-ai-go/genai"
 	"github.com/joho/godotenv"
-	"google.golang.org/api/option"
 
 	"shakehandz-api/internal/router"
+	"shakehandz-api/internal/shared/cache"
 )
 
 func main() {
+	ctx := context.Background()
+
 	if err := godotenv.Load(); err != nil {
 		log.Fatal(".env ファイルの読み込みに失敗しました")
 	}
 
-	apiKey := os.Getenv("GEMINI_API_KEY")
-	if apiKey == "" {
-		log.Fatal("環境変数 GEMINI_API_KEY が設定されていません")
-	}
-
-	ctx := context.Background()
-	genaiClient, err := genai.NewClient(ctx, option.WithAPIKey(apiKey))
+	rdb, err := cache.NewRedisClient(ctx)
 	if err != nil {
-		log.Fatalf("Geminiクライアント初期化失敗: %v", err)
+		log.Fatalf("Redisクライアントの初期化に失敗しました: %v", err)
 	}
-	defer genaiClient.Close()
 
-	r := router.SetupRouter()
+	r := router.SetupRouter(rdb)
 
 	if err := r.Run(":8080"); err != nil {
 		log.Fatalf("サーバー起動失敗: %v", err)
