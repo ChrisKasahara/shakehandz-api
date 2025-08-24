@@ -1,11 +1,12 @@
-package gemini
+package extractor
 
 import (
 	"encoding/json"
 	"fmt"
 	"log"
 	"shakehandz-api/internal/humanresource"
-	cache_ai "shakehandz-api/internal/shared/cache/ai"
+	cache_extractor "shakehandz-api/internal/shared/cache/extractor"
+	"shakehandz-api/internal/shared/llm/gemini"
 	gmsg "shakehandz-api/internal/shared/message/gmail"
 	"shakehandz-api/prompts"
 	"sort"
@@ -32,12 +33,12 @@ func NewGeminiService(f gmsg.MessageIF, db *gorm.DB, rdb *redis.Client) *Service
 	return &Service{Fetcher: f, DB: db, rdb: rdb}
 }
 
-func (s *Service) Run(c *gin.Context, client *Client, gmail_svc *gmail.Service) (bool, error) {
+func (s *Service) Run(c *gin.Context, client *gemini.Client, gmail_svc *gmail.Service) (bool, error) {
 	ctx := c.Request.Context()
 	fmt.Println("NegoはGmailを取得中")
 
 	// DB既存のメッセージIDを除外した未処理メッセージを最大N件取得
-	msgs, err := s.fetchUnprocessedMessages(c, gmail_svc, 9)
+	msgs, err := s.fetchUnprocessedMessages(c, gmail_svc, 30)
 	if err != nil {
 		return false, err
 	}
@@ -50,6 +51,12 @@ func (s *Service) Run(c *gin.Context, client *Client, gmail_svc *gmail.Service) 
 
 	fmt.Println("Gmail取得を完了。今回の解析件数は", len(msgs), "件です。Negoにプロンプトを送信中")
 
+	// Redisからステータスを取得
+	progressStatus, err := cache_extractor.FetchJobStatus(c.Request.Context(), s.rdb, "status")
+	if err != nil {
+		log.Printf("ERROR: Failed to fetch redis: %v", err)
+	}
+
 	// chunkArrayで分割（JSON文字列の配列として）
 	chunkedMsgs := chunkArray(msgs, 3)
 
@@ -60,12 +67,9 @@ func (s *Service) Run(c *gin.Context, client *Client, gmail_svc *gmail.Service) 
 		Parts: []genai.Part{genai.Text(prompts.HRInstruction)},
 	}
 	fmt.Println("Negoは準備完了。続いて変換処理へ移行")
-	progressStatus := cache_ai.JobStatus{
-		JobID:   "status",
-		Status:  "pending",
-		Message: "メール内容の構造化を学習中...",
-	}
-	if err := cache_ai.UpdateStatusInRedis(c.Request.Context(), s.rdb, progressStatus); err != nil {
+	progressStatus.StartJob("メール内容の構造化を学習中...")
+
+	if err := cache_extractor.UpdateStatusInRedis(c.Request.Context(), s.rdb, progressStatus); err != nil {
 		log.Printf("ERROR: Failed to update redis: %v", err)
 	}
 
@@ -100,13 +104,13 @@ func (s *Service) Run(c *gin.Context, client *Client, gmail_svc *gmail.Service) 
 				return fmt.Errorf("Gemini レスポンスが nil です")
 			}
 
-			geminiResponsePart, ok := ExtractText(geminiResponse)
+			geminiResponsePart, ok := gemini.ExtractText(geminiResponse)
 			if !ok {
 				log.Printf("Gemini レスポンスデータの文字列変換不正: %v", geminiResponsePart)
 				return fmt.Errorf("Gemini レスポンスデータの文字列変換不正: %s", geminiResponsePart)
 			}
 
-			trimmedResponse := TrimPrefixAndSuffixGeminiResponse(geminiResponsePart)
+			trimmedResponse := gemini.TrimPrefixAndSuffixGeminiResponse(geminiResponsePart)
 
 			ChunkHumanResources := []humanresource.HumanResource{}
 
@@ -119,12 +123,8 @@ func (s *Service) Run(c *gin.Context, client *Client, gmail_svc *gmail.Service) 
 				mu.Lock()
 				humanResources = append(humanResources, hr)
 				mu.Unlock()
-				progressStatus = cache_ai.JobStatus{
-					JobID:   "status",
-					Status:  "processing",
-					Message: "順調に変換作業を開始しているようです！",
-				}
-				if err := cache_ai.UpdateStatusInRedis(c.Request.Context(), s.rdb, progressStatus); err != nil {
+				progressStatus.UpdateJobStatus("processing", fmt.Sprintf("抽出作業進行中 進捗:%d/%d", len(humanResources), len(msgs)))
+				if err := cache_extractor.UpdateStatusInRedis(c.Request.Context(), s.rdb, progressStatus); err != nil {
 					log.Printf("ERROR: Failed to update redis: %v", err)
 				}
 			}
@@ -172,12 +172,8 @@ func (s *Service) Run(c *gin.Context, client *Client, gmail_svc *gmail.Service) 
 		}
 	}
 
-	progressStatus = cache_ai.JobStatus{
-		JobID:   "status",
-		Status:  "completed",
-		Message: "全ての作業を終えました 🎉",
-	}
-	if err := cache_ai.UpdateStatusInRedis(c.Request.Context(), s.rdb, progressStatus); err != nil {
+	progressStatus.UpdateJobStatus("completed", "メールデータの抽出化を完了しました 🎉")
+	if err := cache_extractor.UpdateStatusInRedis(c.Request.Context(), s.rdb, progressStatus); err != nil {
 		log.Printf("ERROR: Failed to update redis: %v", err)
 	}
 	return true, nil

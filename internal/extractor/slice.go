@@ -1,5 +1,4 @@
-// chunkArray: []*msg.Message を指定件数ごとに分割してJSON文字列の配列で返す
-package gemini
+package extractor
 
 import (
 	"encoding/json"

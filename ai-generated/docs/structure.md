@@ -1,16 +1,67 @@
 # システム構成ドキュメント
 
-## ディレクトリ構成（抜粋）
+## ディレクトリ・ファイル構成と主な責務
 
-- `cmd/server/` ... エントリーポイント
-- `internal/auth/` ... 認証関連
-- `internal/gemini/` ... Gemini 連携
-- `internal/gmail/` ... Gmail 連携・処理
-- `internal/humanresource/` ... 要員情報モデル・ハンドラ
-- `internal/project/` ... プロジェクト情報モデル・ハンドラ
-- `internal/shared/` ... 共通処理（DB, メール IF 等）
-- `prompts/` ... プロンプト・指示文
-- `utils/` ... 汎用ユーティリティ
+- `cmd/server/main.go`
+
+  - サーバのエントリーポイント。Gin, Redis, ルーティング初期化。
+
+- `internal/auth/`
+
+  - `handler.go` ... 認証系 API ハンドラ
+  - `idtoken_user.go` ... ID トークンからユーザー情報取得
+  - `middleware.go` ... Gin 用認証ミドルウェア
+  - `model.go` ... ユーザーモデル定義
+  - `oauth_repo.go` ... Google リフレッシュトークン取得
+  - `upsert_user_with_token.go` ... トークン付きユーザー登録・更新
+
+- `internal/gemini/`
+
+  - `client.go` ... Gemini API クライアント
+  - `handler.go` ... Gemini 連携 API ハンドラ
+  - `message.go` ... 未処理メッセージ取得・処理
+  - `service.go` ... Gemini 連携サービス本体
+  - `slice.go` ... メッセージ配列分割ユーティリティ
+  - `status_handler.go` ... Gemini ステータス API ハンドラ
+  - `text.go` ... Gemini レスポンスからテキスト抽出
+
+- `internal/humanresource/`
+
+  - `handler.go` ... 要員情報 API ハンドラ
+  - `model.go` ... 要員情報モデル定義
+
+- `internal/project/`
+
+  - `handler.go` ... プロジェクト情報 API ハンドラ
+  - `model.go` ... プロジェクト情報モデル定義
+
+- `internal/shared/`
+
+  - `db.go` ... GORM による DB 初期化・マイグレーション
+  - `auth/verified.go` ... ユーザー認証済み判定
+  - `cache/client.go` ... Redis クライアント生成
+  - `cache/ai/model.go` ... AI キャッシュモデル
+  - `cache/ai/redis.go` ... AI キャッシュ用 Redis 操作
+  - `crypto/crypto.go` ... 暗号化・復号化ユーティリティ
+  - `google/oauth.go` ... Google OAuth ユーティリティ
+  - `message/MessageIF.go` ... メッセージ IF 定義
+  - `message/gmail/client.go` ... Gmail API クライアント
+  - `message/gmail/fetcher.go` ... Gmail メッセージ取得
+  - `message/gmail/fetcher_msg_detail.go` ... メッセージ詳細取得
+  - `message/gmail/fetcher_msg_ids.go` ... メッセージ ID 取得
+  - `message/gmail/GmailMessageIF.go` ... Gmail メッセージ IF
+  - `message/gmail/msg_heper.go` ... メッセージ解析・添付抽出
+
+- `internal/router/router.go`
+
+  - ルーティング設定
+
+- `prompts/`
+
+  - プロンプト・指示文格納
+
+- `utils/`
+  - 汎用ユーティリティ
 
 ## 主要モデル
 

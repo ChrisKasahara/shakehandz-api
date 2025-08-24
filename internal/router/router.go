@@ -3,9 +3,9 @@ package router
 
 import (
 	"shakehandz-api/internal/auth"
-	"shakehandz-api/internal/gemini"
+	"shakehandz-api/internal/extractor"
 	"shakehandz-api/internal/humanresource"
-	message "shakehandz-api/internal/message/gmail"
+	message "shakehandz-api/internal/message"
 	"shakehandz-api/internal/middleware"
 	"shakehandz-api/internal/project"
 	config "shakehandz-api/internal/shared"
@@ -33,8 +33,8 @@ func SetupRouter(rdb *redis.Client) *gin.Engine {
 
 	// DI
 	gmailMsgFetcher := gmail.NewGmailMsgFetcher()
-	gmailMsgFetcherSvc := message.NewGmailMsgService(gmailMsgFetcher)
-	geminiService := gemini.NewGeminiService(gmailMsgFetcher, db, rdb)
+	messageSvc := message.NewMessageService(gmailMsgFetcher)
+	geminiService := extractor.NewGeminiService(gmailMsgFetcher, db, rdb)
 	authService := auth.NewAuthService(db)
 	hrHandler := humanresource.NewHumanResourcesHandler(db)
 	projectHandler := project.NewProjectHandler(db)
@@ -43,11 +43,11 @@ func SetupRouter(rdb *redis.Client) *gin.Engine {
 	protected.Use(middleware.AuthMiddleware(db))
 	{
 		// メール
-		protected.GET("/message/gmail", message.GmailHandler(gmailMsgFetcherSvc, db))
+		protected.GET("/message/gmail", message.MessageHandler(messageSvc, db))
 
 		// AI
-		protected.POST("/structure/humanresource", gemini.StructureWithGeminiHandler(geminiService))
-		protected.GET("/structure/status", gemini.GetStructureStatusHandler(rdb))
+		protected.POST("/structure/humanresource", extractor.StructureWithGeminiHandler(geminiService))
+		protected.GET("/structure/status", extractor.GetStructureStatusHandler(rdb))
 
 		// 要員管理
 		protected.GET("/humanresource", hrHandler.GetHumanResources)

@@ -3,9 +3,8 @@ package gemini
 import (
 	"context"
 	"errors"
+	"shakehandz-api/internal/shared/auth/oauth"
 	"shakehandz-api/internal/shared/crypto"
-
-	googleutil "shakehandz-api/internal/shared/google"
 
 	"github.com/google/generative-ai-go/genai"
 	"golang.org/x/oauth2"
@@ -28,7 +27,7 @@ func NewGeminiClientWithRefresh(ctx context.Context, model string, encRefresh []
 	}
 
 	// 2. OAuth2 ConfigとTokenSourceを生成 (Gmailの時と同じ)
-	cfg := googleutil.OAuth2ConfigFromEnv()
+	cfg := oauth.OAuth2ConfigFromEnv()
 	tok := &oauth2.Token{RefreshToken: rt}
 	baseTS := cfg.TokenSource(ctx, tok)
 	ts := oauth2.ReuseTokenSource(nil, baseTS)

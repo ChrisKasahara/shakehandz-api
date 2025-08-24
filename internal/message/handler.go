@@ -3,8 +3,9 @@ package message
 import (
 	"net/http"
 
-	sa "shakehandz-api/internal/shared/auth"
-	gmsg "shakehandz-api/internal/shared/message/gmail"
+	oauth "shakehandz-api/internal/shared/auth/oauth"
+
+	"shakehandz-api/internal/shared/message/gmail"
 
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
@@ -12,17 +13,17 @@ import (
 
 // Gmail同期API: id_tokenからユーザー解決→DBのrefreshを使ってFetch
 // 新しいBFFアーキテクチャに合わせて認証方法を変更しています
-func GmailHandler(svc *GmailMsgService, db *gorm.DB) gin.HandlerFunc {
+func MessageHandler(svc *MessageService, db *gorm.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		ctx := c.Request.Context()
 
-		verified, err := sa.IsUserVerified(c)
+		verified, err := oauth.IsUserVerified(c)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
 		}
 
-		gmail_svc, err := gmsg.NewGmailClientWithRefresh(ctx, verified.Token.RefreshToken)
+		gmail_svc, err := gmail.NewGmailClientWithRefresh(ctx, verified.Token.RefreshToken)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create gmail service"})
 			return

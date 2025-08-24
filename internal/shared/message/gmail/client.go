@@ -4,8 +4,8 @@ import (
 	"context"
 	"errors"
 
+	"shakehandz-api/internal/shared/auth/oauth"
 	"shakehandz-api/internal/shared/crypto"
-	googleutil "shakehandz-api/internal/shared/google"
 
 	"golang.org/x/oauth2"
 	"google.golang.org/api/gmail/v1"
@@ -21,7 +21,7 @@ func NewGmailClientWithRefresh(ctx context.Context, encRefresh []byte) (*gmail.S
 	if err != nil {
 		return nil, err
 	}
-	cfg := googleutil.OAuth2ConfigFromEnv()
+	cfg := oauth.OAuth2ConfigFromEnv()
 	tok := &oauth2.Token{RefreshToken: rt}
 
 	baseTS := cfg.TokenSource(ctx, tok)
