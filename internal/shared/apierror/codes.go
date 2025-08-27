@@ -16,6 +16,7 @@ type commonErrors struct {
 	InvalidRequest   Code
 	ValidationFailed Code
 	JSONParseFailed  Code
+	DatabaseError    Code
 }
 
 // Common は共通エラーコードのインスタンスです。
@@ -24,6 +25,7 @@ var Common = commonErrors{
 	InvalidRequest:   "CM01_0001",
 	ValidationFailed: "CM01_0002",
 	JSONParseFailed:  "CM01_0003",
+	DatabaseError:    "CM01_0004",
 }
 
 // authErrors は認証・認可関連エラーのコードを保持します。
@@ -69,6 +71,7 @@ var errorMap = map[Code]ErrorInfo{
 	Common.InvalidRequest:   {http.StatusBadRequest, "無効なリクエストです。"},
 	Common.ValidationFailed: {http.StatusUnprocessableEntity, "入力内容が正しくありません。"},
 	Common.JSONParseFailed:  {http.StatusBadRequest, "JSONの解析に失敗しました。"},
+	Common.DatabaseError:    {http.StatusInternalServerError, "データベースエラーが発生しました。"},
 
 	// 認証・認可関連エラー
 	Auth.Unauthorized:     {http.StatusUnauthorized, "認証に失敗しました。"},

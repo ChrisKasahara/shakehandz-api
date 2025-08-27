@@ -51,7 +51,7 @@ func SetupRouter(rdb *redis.Client) *gin.Engine {
 
 		// 要員管理
 		protected.GET("/humanresource", hrHandler.GetHumanResources)
-		protected.GET("/humanresource/:id", hrHandler.GetHumanResource)
+		protected.GET("/humanresource/:id", hrHandler.GetHumanResourceByID)
 
 		// 案件管理
 		protected.GET("/projects", projectHandler.GetProjects)
