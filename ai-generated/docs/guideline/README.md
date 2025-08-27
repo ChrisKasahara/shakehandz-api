@@ -12,6 +12,7 @@
   - [`handler/`](../../handler/): API ハンドラ
   - [`router/`](../../router/): ルーティング
 - DB: RDS（MySQL）
+- GeminiService は [`internal/shared/mail/fetcher.go`](../../../internal/shared/mail/fetcher.go) の Fetcher インターフェイスに依存し、メール取得ロジックの実装（例: Gmail）は依存注入で切り替え可能です。
 
 ---
 
@@ -58,6 +59,8 @@
 ## 4. API 設計
 
 - RESTful 設計
+- `/api/gmail/process` は現状「取得メールのキュー登録のみ」。本文・添付ファイルの解析は **TODO（未実装）**
+- `/api/gmail/process` は現状「取得メールのキュー登録のみ」。本文・添付ファイルの解析は **TODO（未実装）**
 - `/projects` でプロジェクト情報取得
 - 必要に応じて `/todos` も利用
 

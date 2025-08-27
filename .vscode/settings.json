@@ -1,3 +1,13 @@
 {
-  "cSpell.words": ["datatypes", "geminiutil", "genai", "gorm", "shakehandz"]
+  "cSpell.words": [
+    "apierror",
+    "datatypes",
+    "geminiutil",
+    "genai",
+    "gmsg",
+    "gorm",
+    "humanresource",
+    "Nego",
+    "shakehandz"
+  ]
 }
