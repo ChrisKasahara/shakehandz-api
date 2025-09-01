@@ -11,29 +11,24 @@ import (
 	"gorm.io/gorm"
 )
 
-type AuthContext struct {
-	User  auth.User
-	Token auth.OauthToken
-}
-
 // AuthMiddlewareは、内部認証とユーザー検索を行うGinミドルウェアです
 func AuthMiddleware(db *gorm.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		// 1. 内部APIトークンを検証
+		// 内部APIトークンを検証
 		internalToken := c.GetHeader("X-App-Auth")
 		if internalToken != os.Getenv("BACKEND_INTERNAL_TOKEN") {
 			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "invalid internal token"})
 			return
 		}
 
-		// 2. ヘッダーから 'X-Google-ID' (sub) を取得
+		// ヘッダーから 'X-Google-ID' (sub) を取得
 		googleID := c.GetHeader("X-Google-ID")
 		if googleID == "" {
 			c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": "missing google id"})
 			return
 		}
 
-		// 3. OAuthTokenを起点にユーザーを検索
+		// OAuthTokenを起点にユーザーを検索
 		var token auth.OauthToken
 		if err := db.Where("provider = ? AND sub = ?", "google", googleID).First(&token).Error; err != nil {
 			c.AbortWithStatusJSON(http.StatusNotFound, gin.H{"error": "token not found for the user"})
@@ -51,15 +46,15 @@ func AuthMiddleware(db *gorm.DB) gin.HandlerFunc {
 			return
 		}
 
-		verifiedUser := AuthContext{
+		verifiedUser := auth.AuthContext{
 			User:  user,
 			Token: token,
 		}
 
-		// 4. ユーザー情報をコンテキストに保存して、次のハンドラーに渡す
+		// ユーザー情報をコンテキストに保存して、次のハンドラーに渡す
 		c.Set("auth", verifiedUser)
 
-		// 5. 次の処理（ミドルウェアまたはハンドラー）に進む
+		// 次の処理（ミドルウェアまたはハンドラー）に進む
 		c.Next()
 	}
 }

@@ -58,16 +58,19 @@
 - **provider_company** : `From:` ヘッダーの企業名、または本文中の「株式会社 / (株) / 有限会社 …」を含む最長語句
 - **sales_person** : 本文中で送信元企業の営業担当と思われる氏名を抽出
 ・フルネーム `{苗字} {名前}`（半角スペース）／苗字のみ可／特定不能は null
-- **candidate_initial** : イニシャル２字 (`A.B` 形式, 半角ドット統一)
+- **candidate_initial** : イニシャル２字 
+・ フォーマットは`A.B` 形式, `{半角英字1文字}.{半角英字1文字}`。
+・ `CD`のように`.`が抜けているものであっても`C.D`とする
+・ イニシャルの順番を勝手に変えることは禁止。
 - **age** : 数値優先。`50代`→59, `40代`→49 等
-- **nationality** : 変換マッピング → nationality に従う
-- **roles** : 変換マッピング → roles に従う
-- **experience_areas** : 変換マッピング → experience_areas に従う
+- **nationality** : 変換マッピング → nationality に従う。変換マッピングの nationality に存在しない項目を独自の判断で作成することは禁止
+- **roles** : 変換マッピング → roles に従う。変換マッピングの roles に存在しない項目を独自の判断で作成することは禁止
+- **experience_areas** : 変換マッピング → experience_areas に従う。変換マッピングの experience_areas に存在しない項目を独自の判断で作成することは禁止
 - **main_skills** : スキル語句の先頭３件（正規化後）
 - **sub_skills** : スキル語句全件（重複除去, 正規化後）
 - **additional_info** : 上記に該当しない PR・注意書き全文（改行→`\n`）
-- **employment_type** : 変換マッピング → employment_type に従う
-- **work_style** : 変換マッピング → work_style に従う
+- **employment_type** : 変換マッピング → employment_type に従う。変換マッピングの employment_type に存在しない項目を独自の判断で作成することは禁止
+- **work_style** : 変換マッピング → work_style に従う。変換マッピングの work_style に存在しない項目を独自の判断で作成することは禁止
 - **is_directly_under** : 所属語句を走査し
 ・ `弊社個人事業主` `自社社員` `直所属` 等 → true
 ・ `１社先` `一社先` `２社先` `BP社員` `不明` 未記載 → false

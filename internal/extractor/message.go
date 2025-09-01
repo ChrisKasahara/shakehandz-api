@@ -3,6 +3,7 @@ package extractor
 import (
 	"fmt"
 
+	"shakehandz-api/internal/auth"
 	"shakehandz-api/internal/humanresource"
 	msg "shakehandz-api/internal/shared/message"
 
@@ -15,6 +16,11 @@ func (s *Service) fetchUnprocessedMessages(c *gin.Context, gmail_svc *gmail.Serv
 	const pageSize = 50
 	// 10ページまでめくって取得する
 	const maxPages = 10
+
+	user, err := auth.GetUser(c)
+	if err != nil {
+		return nil, err
+	}
 
 	// 解析結果を保持
 	var candidates []*msg.Message
@@ -61,6 +67,7 @@ func (s *Service) fetchUnprocessedMessages(c *gin.Context, gmail_svc *gmail.Serv
 		// DBで既存チェック（MessageIDを使用）
 		var existingIDs []string
 		err = s.DB.Model(&humanresource.HumanResource{}).
+			Where("created_by_id = ?", user.ID).
 			Where("message_id IN (?)", messageIDs).
 			Pluck("message_id", &existingIDs).Error
 		if err != nil {

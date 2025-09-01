@@ -1,13 +1,17 @@
 package extractor
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"log"
+	"shakehandz-api/internal/auth"
 	"shakehandz-api/internal/humanresource"
+	"shakehandz-api/internal/shared/apierror"
 	cache_extractor "shakehandz-api/internal/shared/cache/extractor"
 	"shakehandz-api/internal/shared/llm/gemini"
 	gmsg "shakehandz-api/internal/shared/message/gmail"
+	"shakehandz-api/internal/shared/response"
 	"shakehandz-api/prompts"
 	"sort"
 	"strings"
@@ -35,10 +39,18 @@ func NewGeminiService(f gmsg.MessageIF, db *gorm.DB, rdb *redis.Client) *Service
 
 func (s *Service) Run(c *gin.Context, client *gemini.Client, gmail_svc *gmail.Service) (bool, error) {
 	ctx := c.Request.Context()
+	user, err := auth.GetUser(c)
+	if err != nil {
+		response.SendError(c, apierror.Common.Unauthorized, response.ErrorDetail{
+			Detail:   err.Error(),
+			Resource: "extract",
+		})
+	}
+
 	fmt.Println("NegoはGmailを取得中")
 
 	// DB既存のメッセージIDを除外した未処理メッセージを最大N件取得
-	msgs, err := s.fetchUnprocessedMessages(c, gmail_svc, 30)
+	msgs, err := s.fetchUnprocessedMessages(c, gmail_svc, 3)
 	if err != nil {
 		return false, err
 	}
@@ -165,9 +177,16 @@ func (s *Service) Run(c *gin.Context, client *gemini.Client, gmail_svc *gmail.Se
 	})
 
 	fmt.Println("Negoは作業を保存中")
+
+	// ユーザIDをコンテキストにセット
+	ctxForDB := context.WithValue(ctx, "currentUserID", user.ID)
+	// DB接続にコンテキストをセット
+	dbWithContext := s.DB.WithContext(ctxForDB)
+
 	// DB保存処理
 	if len(humanResources) > 0 {
-		if err := s.DB.Create(&humanResources).Error; err != nil {
+		// BeforeCreateでUserIDをセットされるので、ここではセット不要
+		if err := dbWithContext.Create(&humanResources).Error; err != nil {
 			return false, fmt.Errorf("DB保存失敗: %w", err)
 		}
 	}
