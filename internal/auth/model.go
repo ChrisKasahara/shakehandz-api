@@ -37,3 +37,8 @@ type OauthToken struct {
 	UpdatedAt time.Time
 	DeletedAt gorm.DeletedAt `gorm:"index"`
 }
+
+type AuthContext struct {
+	User  User
+	Token OauthToken
+}

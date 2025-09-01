@@ -3,6 +3,7 @@ package humanresource
 import (
 	"net/http"
 
+	"shakehandz-api/internal/auth"
 	"shakehandz-api/internal/shared/apierror"
 	"shakehandz-api/internal/shared/response"
 
@@ -21,7 +22,17 @@ func NewHumanResourcesHandler(db *gorm.DB) *HumanResourcesHandler {
 func (h *HumanResourcesHandler) GetHumanResources(c *gin.Context) {
 	var humans []HumanResource
 
-	if err := h.DB.Order("created_at DESC").Limit(100).Find(&humans).Error; err != nil {
+	user, err := auth.GetUser(c)
+
+	if err != nil {
+		response.SendError(c, apierror.Common.Unknown, response.ErrorDetail{
+			Detail:   "unauthorized",
+			Resource: "human resource",
+		})
+		return
+	}
+
+	if err := h.DB.Where("created_by_id = ?", user.ID).Order("created_at DESC").Limit(100).Find(&humans).Error; err != nil {
 		response.SendError(c, apierror.Common.JSONParseFailed, response.ErrorDetail{
 			Detail:   err.Error(),
 			Resource: "human resource",
@@ -34,8 +45,18 @@ func (h *HumanResourcesHandler) GetHumanResources(c *gin.Context) {
 
 func (h *HumanResourcesHandler) GetHumanResourceByID(c *gin.Context) {
 	id := c.Param("id")
+	user, err := auth.GetUser(c)
+
+	if err != nil {
+		response.SendError(c, apierror.Common.Unauthorized, response.ErrorDetail{
+			Detail:   "unauthorized",
+			Resource: "human resource",
+		})
+		return
+	}
+
 	var human HumanResource
-	if err := h.DB.First(&human, "id = ?", id).Error; err != nil {
+	if err := h.DB.Where("created_by_id = ?", user.ID).First(&human, "id = ?", id).Error; err != nil {
 		response.SendError(c, apierror.Common.JSONParseFailed, response.ErrorDetail{
 			Detail:   err.Error(),
 			Resource: "human resource",

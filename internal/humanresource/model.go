@@ -1,9 +1,12 @@
 package humanresource
 
 import (
+	"shakehandz-api/internal/auth"
 	"time"
 
+	"github.com/google/uuid"
 	"gorm.io/datatypes"
+
 	"gorm.io/gorm"
 )
 
@@ -73,28 +76,28 @@ type HumanResource struct {
 	ID        uint   `gorm:"primaryKey;autoIncrement" json:"id"`
 	MessageID string `gorm:"type:varchar(255);uniqueIndex" json:"message_id"`
 
-	/* 1. メールから直接抜ける情報 */
+	/* メールから直接抜ける情報 */
 	AttachmentType     *string `gorm:"type:varchar(50)"  json:"attachment_type,omitempty"`
 	AttachmentFilename *string `gorm:"type:varchar(255)" json:"attachment_filename,omitempty"`
 	EmailReceivedAt    string  `json:"email_received_at"`
 	ProviderCompany    *string `gorm:"type:varchar(255)" json:"provider_company,omitempty"`
 	SalesPerson        *string `gorm:"type:varchar(255)" json:"sales_person,omitempty"`
 
-	/* 2. 要員の基本情報（年齢・氏名・国籍） */
+	/* 要員の基本情報（年齢・氏名・国籍） */
 	CandidateInitial *string      `gorm:"type:varchar(10)" json:"candidate_initial,omitempty"`
 	Age              *uint8       `json:"age,omitempty"`
 	Nationality      *Nationality `gorm:"type:enum('japan','foreigner','naturalized')" json:"nationality,omitempty"`
 
-	/* 3. 要員の領域に関する情報 */
+	/* 要員の領域に関する情報 */
 	Roles           datatypes.JSONSlice[Role]           `gorm:"type:json" json:"roles,omitempty"`
 	ExperienceAreas datatypes.JSONSlice[ExperienceArea] `gorm:"type:json" json:"experience_areas,omitempty"`
 
-	/* 4. 要員のスキルに関する情報 */
+	/* 要員のスキルに関する情報 */
 	MainSkills     datatypes.JSONSlice[string] `gorm:"type:json" json:"main_skills,omitempty"`
 	SubSkills      datatypes.JSONSlice[string] `gorm:"type:json" json:"sub_skills,omitempty"`
 	AdditionalInfo *string                     `gorm:"type:text" json:"additional_info,omitempty"`
 
-	/* 5. 要員の所属や働き方などの情報 */
+	/* 要員の所属や働き方などの情報 */
 	EmploymentType       *EmploymentType          `gorm:"type:enum('fulltime','freelance','other')" json:"employment_type,omitempty"`
 	WorkStyle            *WorkStyle               `gorm:"type:enum('full_remote','combined','onSite')" json:"work_style,omitempty"`
 	IsDirectlyUnder      bool                     `json:"is_directly_under"`
@@ -106,8 +109,38 @@ type HumanResource struct {
 	HourlyRateMax        *uint                    `json:"hourly_rate_max,omitempty"`
 	HourlyRateMin        *uint                    `json:"hourly_rate_min,omitempty"`
 
-	/* 6. メタ情報 */
-	CreatedAt time.Time      `json:"created_at"`
-	UpdatedAt time.Time      `json:"updated_at"`
-	DeletedAt gorm.DeletedAt `gorm:"index" json:"-"`
+	/* メタ情報 */
+	CreatedAt   time.Time      `json:"created_at"`
+	UpdatedAt   time.Time      `json:"updated_at"`
+	CreatedByID *uuid.UUID     `gorm:"type:char(36)" json:"created_by_id,omitempty"`
+	UpdatedByID *uuid.UUID     `gorm:"type:char(36)" json:"updated_by_id,omitempty"`
+	DeletedAt   gorm.DeletedAt `gorm:"index" json:"-"`
+
+	// Userモデルとのリレーションを定義
+	// これにより、Preloadなどでユーザー情報を一緒に取得できる
+	Creator *auth.User `gorm:"foreignKey:CreatedByID;references:ID" json:"creator,omitempty"`
+	Updater *auth.User `gorm:"foreignKey:UpdatedByID;references:ID" json:"updater,omitempty"`
+}
+
+// BeforeCreate は、HumanResourceレコードが作成される前に呼び出される
+func (hr *HumanResource) BeforeCreate(tx *gorm.DB) (err error) {
+	// コンテキストから "currentUserID" を取得
+	value := tx.Statement.Context.Value("currentUserID")
+
+	// 型アサーションで uuid.UUID に変換
+	if userID, ok := value.(uuid.UUID); ok {
+		// 作成者IDと更新者IDにセット
+		hr.CreatedByID = &userID
+		hr.UpdatedByID = &userID
+	}
+	return
+}
+
+// BeforeUpdateも念の為確認（将来の更新処理のため）
+func (hr *HumanResource) BeforeUpdate(tx *gorm.DB) (err error) {
+	value := tx.Statement.Context.Value("currentUserID")
+	if userID, ok := value.(uuid.UUID); ok {
+		hr.UpdatedByID = &userID
+	}
+	return
 }
