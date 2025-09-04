@@ -18,6 +18,7 @@ type commonErrors struct {
 	JSONParseFailed  Code
 	DatabaseError    Code
 	Unauthorized     Code
+	SemaphoreError   Code
 }
 
 // Common は共通エラーコードのインスタンスです。
@@ -28,6 +29,7 @@ var Common = commonErrors{
 	JSONParseFailed:  "CM01_0003",
 	DatabaseError:    "CM01_0004",
 	Unauthorized:     "CM01_0005",
+	SemaphoreError:   "CM01_0006",
 }
 
 // authErrors は認証・認可関連エラーのコードを保持します。
@@ -58,6 +60,36 @@ var Redis = redisErrors{
 	UpdateDataFailed: "RD03_0001",
 }
 
+// GmailErrors はGmail関連エラーのコードを保持します。
+type GmailErrors struct {
+	CreateClientFailed Code
+}
+
+// Gmail はGmail関連エラーコードのインスタンスです。
+var Gmail = GmailErrors{
+	CreateClientFailed: "GM01_0001",
+}
+
+type extractorErrors struct {
+	Unknown                       Code
+	FetchUnprocessedMessageFailed Code
+}
+
+var Extractor = extractorErrors{
+	Unknown:                       "EX00_0001",
+	FetchUnprocessedMessageFailed: "EX01_0001",
+}
+
+type optionsErrors struct {
+	Unknown             Code
+	SaveSkillDataFailed Code
+}
+
+var Options = optionsErrors{
+	Unknown:             "OP00_0001",
+	SaveSkillDataFailed: "OP01_0001",
+}
+
 // --- エラーコードと情報の紐付け ---
 
 // ErrorInfo は各エラーコードに紐づく情報（HTTPステータスとデフォルトメッセージ）を保持します。
@@ -75,6 +107,7 @@ var errorMap = map[Code]ErrorInfo{
 	Common.JSONParseFailed:  {http.StatusBadRequest, "JSONの解析に失敗しました。"},
 	Common.DatabaseError:    {http.StatusInternalServerError, "データベースエラーが発生しました。"},
 	Common.Unauthorized:     {http.StatusUnauthorized, "認証に失敗しました。"},
+	Common.SemaphoreError:   {http.StatusInternalServerError, "セマフォの取得に失敗しました。"},
 
 	// 認証・認可関連エラー
 	Auth.Unauthorized:     {http.StatusUnauthorized, "認証に失敗しました。"},
@@ -85,6 +118,16 @@ var errorMap = map[Code]ErrorInfo{
 	Redis.SessionNotFound:  {http.StatusNotFound, "セッションが見つかりませんでした。"},
 	Redis.GetDataFailed:    {http.StatusInternalServerError, "データの取得に失敗しました。"},
 	Redis.UpdateDataFailed: {http.StatusInternalServerError, "データの更新に失敗しました。"},
+
+	// Gmail関連エラー
+	Gmail.CreateClientFailed: {http.StatusInternalServerError, "Gmailクライアントの作成に失敗しました。"},
+
+	// Extractor関連エラー
+	Extractor.Unknown:                       {http.StatusInternalServerError, "不明なエラーが発生しました。"},
+	Extractor.FetchUnprocessedMessageFailed: {http.StatusInternalServerError, "未処理メッセージの取得処理でエラーが発生しました。"},
+
+	// Options関連エラー
+	Options.SaveSkillDataFailed: {http.StatusInternalServerError, "スキルオプションデータの保存に失敗しました。"},
 }
 
 // GetInfo はエラーコードに対応するErrorInfoを取得します。

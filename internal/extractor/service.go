@@ -1,7 +1,6 @@
 package extractor
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -11,6 +10,7 @@ import (
 	cache_extractor "shakehandz-api/internal/shared/cache/extractor"
 	"shakehandz-api/internal/shared/llm/gemini"
 	gmsg "shakehandz-api/internal/shared/message/gmail"
+	"shakehandz-api/internal/shared/options"
 	"shakehandz-api/internal/shared/response"
 	"shakehandz-api/prompts"
 	"sort"
@@ -40,6 +40,7 @@ func NewGeminiService(f gmsg.MessageIF, db *gorm.DB, rdb *redis.Client) *Service
 func (s *Service) Run(c *gin.Context, client *gemini.Client, gmail_svc *gmail.Service) (bool, error) {
 	ctx := c.Request.Context()
 	user, err := auth.GetUser(c)
+
 	if err != nil {
 		response.SendError(c, apierror.Common.Unauthorized, response.ErrorDetail{
 			Detail:   err.Error(),
@@ -50,8 +51,12 @@ func (s *Service) Run(c *gin.Context, client *gemini.Client, gmail_svc *gmail.Se
 	fmt.Println("NegoはGmailを取得中")
 
 	// DB既存のメッセージIDを除外した未処理メッセージを最大N件取得
-	msgs, err := s.fetchUnprocessedMessages(c, gmail_svc, 3)
+	msgs, err := s.fetchUnprocessedMessages(c, gmail_svc, 30)
 	if err != nil {
+		response.SendError(c, apierror.Extractor.FetchUnprocessedMessageFailed, response.ErrorDetail{
+			Detail:   err.Error(),
+			Resource: "extract",
+		})
 		return false, err
 	}
 
@@ -66,7 +71,10 @@ func (s *Service) Run(c *gin.Context, client *gemini.Client, gmail_svc *gmail.Se
 	// Redisからステータスを取得
 	progressStatus, err := cache_extractor.FetchJobStatus(c.Request.Context(), s.rdb, "status")
 	if err != nil {
-		log.Printf("ERROR: Failed to fetch redis: %v", err)
+		response.SendError(c, apierror.Redis.GetDataFailed, response.ErrorDetail{
+			Detail:   err.Error(),
+			Resource: "extract",
+		})
 	}
 
 	// chunkArrayで分割（JSON文字列の配列として）
@@ -82,7 +90,10 @@ func (s *Service) Run(c *gin.Context, client *gemini.Client, gmail_svc *gmail.Se
 	progressStatus.StartJob("メール内容の構造化を学習中...")
 
 	if err := cache_extractor.UpdateStatusInRedis(c.Request.Context(), s.rdb, progressStatus); err != nil {
-		log.Printf("ERROR: Failed to update redis: %v", err)
+		response.SendError(c, apierror.Redis.UpdateDataFailed, response.ErrorDetail{
+			Detail:   err.Error(),
+			Resource: "extract",
+		})
 	}
 
 	g, ctx := errgroup.WithContext(ctx)
@@ -98,6 +109,10 @@ func (s *Service) Run(c *gin.Context, client *gemini.Client, gmail_svc *gmail.Se
 		}
 
 		if err := sem.Acquire(ctx, 1); err != nil {
+			response.SendError(c, apierror.Common.SemaphoreError, response.ErrorDetail{
+				Detail:   err.Error(),
+				Resource: "extract",
+			})
 			return false, fmt.Errorf("セマフォの取得に失敗: %w", err)
 		}
 
@@ -128,6 +143,7 @@ func (s *Service) Run(c *gin.Context, client *gemini.Client, gmail_svc *gmail.Se
 
 			if err := json.Unmarshal([]byte(trimmedResponse), &ChunkHumanResources); err != nil {
 				log.Printf("JSON Unmarshal失敗: %v", err)
+				log.Printf("Geminiレスポンス: %s", trimmedResponse)
 				return fmt.Errorf("JSON Unmarshal失敗: %w", err)
 			}
 
@@ -176,18 +192,37 @@ func (s *Service) Run(c *gin.Context, client *gemini.Client, gmail_svc *gmail.Se
 		return humanResources[i].CreatedAt.Unix() > humanResources[j].CreatedAt.Unix()
 	})
 
-	fmt.Println("Negoは作業を保存中")
+	// 登録されたすべてのスキルをまとめる
+	var allSkills []string
+	for _, hr := range humanResources {
+		for _, skill := range hr.MainSkills {
+			allSkills = append(allSkills, skill)
+		}
+		for _, skill := range hr.SubSkills {
+			allSkills = append(allSkills, skill)
+		}
+	}
 
-	// ユーザIDをコンテキストにセット
-	ctxForDB := context.WithValue(ctx, "currentUserID", user.ID)
-	// DB接続にコンテキストをセット
-	dbWithContext := s.DB.WithContext(ctxForDB)
+	fmt.Println("Negoは作業を保存中")
 
 	// DB保存処理
 	if len(humanResources) > 0 {
+		for i := range humanResources {
+			humanResources[i].CreatedByID = &user.ID
+			humanResources[i].UpdatedByID = &user.ID
+		}
+
 		// BeforeCreateでUserIDをセットされるので、ここではセット不要
-		if err := dbWithContext.Create(&humanResources).Error; err != nil {
+		if err := s.DB.Create(&humanResources).Error; err != nil {
 			return false, fmt.Errorf("DB保存失敗: %w", err)
+		}
+
+		if err := options.SaveSkills(s.DB, allSkills); err != nil {
+			response.SendError(c, apierror.Options.SaveSkillDataFailed, response.ErrorDetail{
+				Detail:   err.Error(),
+				Resource: "extract",
+			})
+			return false, err
 		}
 	}
 

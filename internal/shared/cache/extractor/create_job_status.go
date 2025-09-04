@@ -26,7 +26,7 @@ func (js *JobStatus) UpdateJobStatus(status, message string) {
 
 func (js *JobStatus) StartJob(message string) {
 	if js.Status == "idle" {
-		js.Status = "processing"
+		js.Status = "pending"
 		js.UpdatedAt = time.Now()
 		js.StartedAt = time.Now()
 		js.Message = message

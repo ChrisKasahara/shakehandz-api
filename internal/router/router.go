@@ -10,6 +10,7 @@ import (
 	"shakehandz-api/internal/project"
 	config "shakehandz-api/internal/shared"
 	"shakehandz-api/internal/shared/message/gmail"
+	"shakehandz-api/internal/shared/options"
 	"time"
 
 	"github.com/gin-contrib/cors"
@@ -39,6 +40,8 @@ func SetupRouter(rdb *redis.Client) *gin.Engine {
 	hrHandler := humanresource.NewHumanResourcesHandler(db)
 	projectHandler := project.NewProjectHandler(db)
 
+	optionsHandler := options.NewOptionsHandler(db)
+
 	protected := r.Group("/api")
 	protected.Use(middleware.AuthMiddleware(db))
 	{
@@ -56,6 +59,9 @@ func SetupRouter(rdb *redis.Client) *gin.Engine {
 		// 案件管理
 		protected.GET("/projects", projectHandler.GetProjects)
 		protected.GET("/projects/:id", projectHandler.GetProject)
+
+		// 選択肢取得系
+		protected.GET("/options/skills", optionsHandler.GetSkills)
 
 	}
 

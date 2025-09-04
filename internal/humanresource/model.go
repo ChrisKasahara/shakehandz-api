@@ -121,26 +121,3 @@ type HumanResource struct {
 	Creator *auth.User `gorm:"foreignKey:CreatedByID;references:ID" json:"creator,omitempty"`
 	Updater *auth.User `gorm:"foreignKey:UpdatedByID;references:ID" json:"updater,omitempty"`
 }
-
-// BeforeCreate は、HumanResourceレコードが作成される前に呼び出される
-func (hr *HumanResource) BeforeCreate(tx *gorm.DB) (err error) {
-	// コンテキストから "currentUserID" を取得
-	value := tx.Statement.Context.Value("currentUserID")
-
-	// 型アサーションで uuid.UUID に変換
-	if userID, ok := value.(uuid.UUID); ok {
-		// 作成者IDと更新者IDにセット
-		hr.CreatedByID = &userID
-		hr.UpdatedByID = &userID
-	}
-	return
-}
-
-// BeforeUpdateも念の為確認（将来の更新処理のため）
-func (hr *HumanResource) BeforeUpdate(tx *gorm.DB) (err error) {
-	value := tx.Statement.Context.Value("currentUserID")
-	if userID, ok := value.(uuid.UUID); ok {
-		hr.UpdatedByID = &userID
-	}
-	return
-}

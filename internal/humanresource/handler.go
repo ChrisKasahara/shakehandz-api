@@ -25,8 +25,8 @@ func (h *HumanResourcesHandler) GetHumanResources(c *gin.Context) {
 	user, err := auth.GetUser(c)
 
 	if err != nil {
-		response.SendError(c, apierror.Common.Unknown, response.ErrorDetail{
-			Detail:   "unauthorized",
+		response.SendError(c, apierror.Common.Unauthorized, response.ErrorDetail{
+			Detail:   err.Error(),
 			Resource: "human resource",
 		})
 		return
