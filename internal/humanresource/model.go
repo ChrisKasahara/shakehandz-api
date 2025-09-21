@@ -121,3 +121,44 @@ type HumanResource struct {
 	Creator *auth.User `gorm:"foreignKey:CreatedByID;references:ID" json:"creator,omitempty"`
 	Updater *auth.User `gorm:"foreignKey:UpdatedByID;references:ID" json:"updater,omitempty"`
 }
+
+type HumanResourceFilter struct {
+	// テキスト入力
+	FreeWord string `form:"free_word" json:"free_word"`
+
+	// 数値範囲（配列形式）
+	Age       []int `form:"age" json:"age"`
+	UnitPrice []int `form:"unit_price" json:"unit_price"`
+
+	// チェックボックス（文字列配列）
+	EmploymentType []string `form:"employmentType" json:"employment_type"`
+	Nationality    []string `form:"nationality" json:"nationality"`
+	WorkStyle      []string `form:"workStyle" json:"work_style"`
+
+	// セレクト（オブジェクト形式）
+	MainSkills []string `json:"main_skills"`
+	SubSkills  []string `json:"sub_skills"`
+
+	// スイッチ（真偽値）
+	Affiliation *bool `form:"affiliation" json:"affiliation"`
+
+	// 最もふるい受信日
+	ReceiveAt string `form:"receive_at" json:"receive_at"`
+
+	// ページング用
+	Page  int `form:"page" json:"page"`
+	Limit int `form:"limit" json:"limit"`
+}
+
+type HumanResourceResponse struct {
+	Pagination         PaginationInfo       `json:"pagination"`
+	AppliedFilters     *HumanResourceFilter `json:"appliedFilters"`
+	HumanResourcesData []HumanResource      `json:"humanResourcesData"`
+}
+
+type PaginationInfo struct {
+	Page       int   `json:"page"`
+	Limit      int   `json:"limit"`
+	Total      int64 `json:"total"`
+	TotalPages int64 `json:"total_pages"`
+}

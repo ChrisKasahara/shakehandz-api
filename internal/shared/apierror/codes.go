@@ -19,6 +19,7 @@ type commonErrors struct {
 	DatabaseError    Code
 	Unauthorized     Code
 	SemaphoreError   Code
+	BadRequest       Code
 }
 
 // Common は共通エラーコードのインスタンスです。
@@ -30,6 +31,7 @@ var Common = commonErrors{
 	DatabaseError:    "CM01_0004",
 	Unauthorized:     "CM01_0005",
 	SemaphoreError:   "CM01_0006",
+	BadRequest:       "CM01_0007",
 }
 
 // authErrors は認証・認可関連エラーのコードを保持します。
@@ -108,6 +110,7 @@ var errorMap = map[Code]ErrorInfo{
 	Common.DatabaseError:    {http.StatusInternalServerError, "データベースエラーが発生しました。"},
 	Common.Unauthorized:     {http.StatusUnauthorized, "認証に失敗しました。"},
 	Common.SemaphoreError:   {http.StatusInternalServerError, "セマフォの取得に失敗しました。"},
+	Common.BadRequest:       {http.StatusBadRequest, "不正なリクエストです。"},
 
 	// 認証・認可関連エラー
 	Auth.Unauthorized:     {http.StatusUnauthorized, "認証に失敗しました。"},

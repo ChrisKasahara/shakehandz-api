@@ -48,10 +48,10 @@ func (s *Service) Run(c *gin.Context, client *gemini.Client, gmail_svc *gmail.Se
 		})
 	}
 
-	fmt.Println("NegoはGmailを取得中")
+	fmt.Println("kmoaiはGmailを取得中")
 
 	// DB既存のメッセージIDを除外した未処理メッセージを最大N件取得
-	msgs, err := s.fetchUnprocessedMessages(c, gmail_svc, 30)
+	msgs, err := s.fetchUnprocessedMessages(c, gmail_svc, 10)
 	if err != nil {
 		response.SendError(c, apierror.Extractor.FetchUnprocessedMessageFailed, response.ErrorDetail{
 			Detail:   err.Error(),
@@ -66,7 +66,7 @@ func (s *Service) Run(c *gin.Context, client *gemini.Client, gmail_svc *gmail.Se
 		return false, nil
 	}
 
-	fmt.Println("Gmail取得を完了。今回の解析件数は", len(msgs), "件です。Negoにプロンプトを送信中")
+	fmt.Println("Gmail取得を完了。今回の解析件数は", len(msgs), "件です。kmoaiにプロンプトを送信中")
 
 	// Redisからステータスを取得
 	progressStatus, err := cache_extractor.FetchJobStatus(c.Request.Context(), s.rdb, "status")
@@ -86,7 +86,7 @@ func (s *Service) Run(c *gin.Context, client *gemini.Client, gmail_svc *gmail.Se
 		Role:  "system",
 		Parts: []genai.Part{genai.Text(prompts.HRInstruction)},
 	}
-	fmt.Println("Negoは準備完了。続いて変換処理へ移行")
+	fmt.Println("kmoaiは準備完了。続いて変換処理へ移行")
 	progressStatus.StartJob("メール内容の構造化を学習中...")
 
 	if err := cache_extractor.UpdateStatusInRedis(c.Request.Context(), s.rdb, progressStatus); err != nil {
@@ -185,7 +185,7 @@ func (s *Service) Run(c *gin.Context, client *gemini.Client, gmail_svc *gmail.Se
 
 	humanResources = uniq
 
-	fmt.Println("Negoは全ての変換を完了しました。総件数：", len(humanResources), "件です。最後の整形を行なっています")
+	fmt.Println("kmoaiは全ての変換を完了しました。総件数：", len(humanResources), "件です。最後の整形を行なっています")
 
 	// 日付で降順
 	sort.Slice(humanResources, func(i, j int) bool {
@@ -203,7 +203,7 @@ func (s *Service) Run(c *gin.Context, client *gemini.Client, gmail_svc *gmail.Se
 		}
 	}
 
-	fmt.Println("Negoは作業を保存中")
+	fmt.Println("kmoaiは作業を保存中")
 
 	// DB保存処理
 	if len(humanResources) > 0 {

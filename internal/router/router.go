@@ -53,8 +53,8 @@ func SetupRouter(rdb *redis.Client) *gin.Engine {
 		protected.GET("/structure/status", extractor.GetStructureStatusHandler(rdb))
 
 		// 要員管理
-		protected.GET("/humanresource", hrHandler.GetHumanResources)
 		protected.GET("/humanresource/:id", hrHandler.GetHumanResourceByID)
+		protected.POST("/humanresource", hrHandler.GetHumanResourcesWithFilter)
 
 		// 案件管理
 		protected.GET("/projects", projectHandler.GetProjects)
