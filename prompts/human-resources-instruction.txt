@@ -54,7 +54,7 @@
 - **message_id** : データ(Gmailデータ)のIdをそのまま設定(編集厳禁)
 - **attachment_type** : 添付ファイル拡張子（小文字, 例 `"pdf"`）
 - **attachment_filename** : 添付ファイル名（拡張子含む）
-- **email_received_at** : ヘッダー `Date:` を YYYY‑MM‑DD に変換。無ければ null
+- **email_received_at** : ヘッダー `Date:` を `YYYY‑MM‑DD hh:mm:ss` に変換。無ければ null
 - **provider_company** : `From:` ヘッダーの企業名、または本文中の「株式会社 / (株) / 有限会社 …」を含む最長語句
 - **sales_person** : 本文中で送信元企業の営業担当と思われる氏名を抽出
 ・フルネーム `{苗字} {名前}`（半角スペース）／苗字のみ可／特定不能は null
@@ -67,10 +67,12 @@
 - **roles** : 変換マッピング → roles に従う。変換マッピングの roles に存在しない項目を独自の判断で作成することは禁止
 - **experience_areas** : 変換マッピング → experience_areas に従う。変換マッピングの experience_areas に存在しない項目を独自の判断で作成することは禁止
 - **main_skills** : スキル語句の先頭３件（正規化後）
+・技術的なスキルのみに限定。「要件定義」「顧客折衝」「コンサルタント」「英語」「資料作成」などは対象外とする
 - **sub_skills** : スキル語句全件（重複除去, 正規化後）
+・技術的なスキルのみに限定。「要件定義」「顧客折衝」「コンサルタント」「英語」「資料作成」などは対象外とする
 - **additional_info** : 上記に該当しない PR・注意書き全文（改行→`\n`）
 - **employment_type** : 変換マッピング → employment_type に従う。変換マッピングの employment_type に存在しない項目を独自の判断で作成することは禁止
-- **work_style** : 変換マッピング → work_style に従う。変換マッピングの work_style に存在しない項目を独自の判断で作成することは禁止
+- **work_style** : 働き方、勤務形態、最寄駅などの項目に記載されていることが多い。変換マッピング → work_style に従う。変換マッピングの work_style に存在しない項目を独自の判断で作成することは禁止
 - **is_directly_under** : 所属語句を走査し
 ・ `弊社個人事業主` `自社社員` `直所属` 等 → true
 ・ `１社先` `一社先` `２社先` `BP社員` `不明` 未記載 → false
@@ -117,11 +119,12 @@
 - `外国籍|ベトナム籍|中国|韓国人|Indian|フィリピン籍|ネパール人|バングラデシュ` など → `foreigner`
 - `帰化|帰化済み|元◯◯籍` → `naturalized`
 - `日本国籍|日本人|Japanese` または記載無し → `japan`
+-  `不明|記載なし`など明確に不明であることが明記されている場合のみ → `unknown`
 
 ### work_style
-- `フルリモート|完全フルリモート|出社不可|初回のみ出社` → `fullRemote`
-- `リモート併用|週[0-9]日出社|ハイブリッド` → `combined`
-- `常駐|フル出社|出社可能|通勤可能` → `onSite`
+- `フルリモート|フルリモートのみ|完全フルリモート|出社不可|初回のみ出社` などテレワークを示唆する文言 → `fullRemote`
+- `リモート併用|週[0-9]日出社|ハイブリッド`などテレワークと通勤の組み合わせを示唆する文言 → `combined`
+- `常駐|フル出社|出社可能|通勤可能`など通勤を示唆する文言 → `onSite`
 
 ## 4. 入力 & 出力例
 ▼Input（抜粋）
@@ -142,14 +145,12 @@ Attachment: resume.PDF
 
 ▼Expected JSON 配列
 [{
-
-"message_id": "0000efxxcbc000a5,
+  "message_id": "0000efxxcbc000a5,
   "attachment_type": "pdf",
   "attachment_filename": "resume.PDF",
   "email_received_at": "2025-07-30",
   "provider_company": "株式会社イグザンプル",
   "sales_person": "山田 浩一郎",
-
   "candidate_initial": null,
   "age": 59,
   "nationality": "japan",

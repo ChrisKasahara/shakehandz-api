@@ -1,42 +1,30 @@
 package extractor
 
 import (
+	"context"
 	"fmt"
 
 	"shakehandz-api/internal/auth"
 	"shakehandz-api/internal/humanresource"
 	msg "shakehandz-api/internal/shared/message"
 
-	"github.com/gin-gonic/gin"
 	"google.golang.org/api/gmail/v1"
 )
 
-func (s *Service) fetchUnprocessedMessages(c *gin.Context, gmail_svc *gmail.Service, target int) ([]*msg.Message, error) {
-	// ページング設定
-	const pageSize = 50
-	// 10ページまでめくって取得する
-	const maxPages = 10
-
-	user, err := auth.GetUser(c)
-	if err != nil {
-		return nil, err
-	}
-
+func (s *Service) fetchUnprocessedMessages(ctx context.Context, user auth.User, gmail_svc *gmail.Service, target int) ([]*msg.Message, error) {
 	// 解析結果を保持
 	var candidates []*msg.Message
 	seenIDs := make(map[string]bool)
 	pageToken := ""
 	pageCount := 0
 
-	ctx := c.Request.Context()
-
 	// 指定件数に達するまでページングでメッセージを取得
-	for len(candidates) < target && pageCount < maxPages {
+	for len(candidates) < target && pageCount < MaxPages {
 		pageCount++
-		fmt.Printf("ページ %d/%d を処理中...\n", pageCount, maxPages)
+		fmt.Printf("ページ %d/%d を処理中...\n", pageCount, MaxPages)
 
 		// ページング対応でメッセージを取得
-		msgs, nextPageToken, err := s.Fetcher.FetchMsgWithPaging(ctx, gmail_svc, "has:attachment", pageSize, pageToken)
+		msgs, nextPageToken, err := s.Fetcher.FetchMsgWithPaging(ctx, gmail_svc, "has:attachment", PageSize, pageToken)
 		if err != nil {
 			return nil, fmt.Errorf("Gmail API 呼び出し失敗: %w", err)
 		}
@@ -102,8 +90,8 @@ func (s *Service) fetchUnprocessedMessages(c *gin.Context, gmail_svc *gmail.Serv
 		}
 	}
 
-	if pageCount >= maxPages {
-		fmt.Printf("最大ページ数 %d に達しました\n", maxPages)
+	if pageCount >= MaxPages {
+		fmt.Printf("最大ページ数 %d に達しました\n", MaxPages)
 	}
 
 	// 目標件数まで切り詰め

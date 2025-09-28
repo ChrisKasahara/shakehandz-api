@@ -1,52 +1,61 @@
 package extractor
 
 import (
-	"net/http"
-
-	"shakehandz-api/internal/shared/apierror"
-	"shakehandz-api/internal/shared/auth/oauth"
+	"fmt"
 	"shakehandz-api/internal/shared/llm/gemini"
-	"shakehandz-api/internal/shared/message/gmail"
-	"shakehandz-api/internal/shared/response"
+	"sync"
+	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
+	"google.golang.org/api/gmail/v1"
 )
 
-// Geminiサービス呼び出し用ハンドラ
-func StructureWithGeminiHandler(svc *Service) gin.HandlerFunc {
+type ClientData struct {
+	UserID     uuid.UUID
+	gmail_svc  *gmail.Service
+	gemini_cli *gemini.Client
+	UpdatedAt  time.Time
+}
+
+var (
+	userData  = make(map[uuid.UUID]*ClientData)
+	userMutex = sync.RWMutex{}
+)
+
+func UpdateClientData(userID uuid.UUID, newGmailService *gmail.Service, newGeminiClient *gemini.Client) {
+	userMutex.Lock()
+	defer userMutex.Unlock()
+
+	if existing, exists := userData[userID]; exists {
+		existing.gmail_svc = newGmailService
+		existing.gemini_cli = newGeminiClient
+		existing.UpdatedAt = time.Now()
+	} else {
+		userData[userID] = &ClientData{
+			UserID:     userID,
+			gmail_svc:  newGmailService,
+			gemini_cli: newGeminiClient,
+			UpdatedAt:  time.Now(),
+		}
+	}
+}
+
+func GetClientData(userID uuid.UUID) (*ClientData, bool) {
+	userMutex.RLock()
+	defer userMutex.RUnlock()
+	data, exists := userData[userID]
+	return data, exists
+}
+
+func RefreshExtractorTokenHandler(svc *Service) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		ctx := c.Request.Context()
+		err := svc.Run(c)
 
-		// ユーザ認証
-		verified, err := oauth.IsUserVerified(c)
 		if err != nil {
-			response.SendError(c, apierror.Common.Unauthorized, response.ErrorDetail{
-				Detail:   err.Error(),
-				Resource: "human resource",
-			})
+			fmt.Println("Error in RefreshExtractorTokenHandler:", err)
 			return
 		}
 
-		cli, _ := gemini.NewGeminiClientWithRefresh(ctx, "models/gemini-2.5-flash", verified.Token.RefreshToken)
-
-		gmail_svc, err := gmail.NewGmailClientWithRefresh(ctx, verified.Token.RefreshToken)
-		if err != nil {
-			response.SendError(c, apierror.Gmail.CreateClientFailed, response.ErrorDetail{
-				Detail:   "failed to create gmail service",
-				Resource: "gmail",
-			})
-			return
-		}
-
-		ok, err := svc.Run(c, cli, gmail_svc)
-		if err != nil {
-			response.SendError(c, apierror.Extractor.Unknown, response.ErrorDetail{
-				Detail:   err.Error(),
-				Resource: "extractor",
-			})
-			return
-		}
-
-		c.JSON(http.StatusOK, ok)
 	}
 }

@@ -94,7 +94,7 @@ func (h *HumanResourcesHandler) GetHumanResourcesWithFilter(c *gin.Context) {
 	offset := (filter.Page - 1) * filter.Limit
 	query = query.Offset(offset).Limit(filter.Limit)
 
-	query = query.Order("created_at DESC")
+	query = query.Order("email_received_at DESC")
 
 	if err := query.Find(&humansResource).Error; err != nil {
 		response.SendError(c, apierror.Common.DatabaseError, response.ErrorDetail{

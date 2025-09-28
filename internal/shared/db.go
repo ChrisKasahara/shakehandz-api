@@ -5,6 +5,7 @@ import (
 	"log"
 	"os"
 	"shakehandz-api/internal/auth"
+	"shakehandz-api/internal/extractor"
 	"shakehandz-api/internal/humanresource"
 	"shakehandz-api/internal/project"
 	"shakehandz-api/internal/shared/options"
@@ -32,7 +33,7 @@ func InitDB() *gorm.DB {
 		log.Fatal("DB接続失敗:", err)
 	}
 
-	if err := db.AutoMigrate(&project.Project{}, &humanresource.HumanResource{}, &auth.User{}, &auth.OauthToken{}, &options.Skills{}); err != nil {
+	if err := db.AutoMigrate(&project.Project{}, &humanresource.HumanResource{}, &auth.User{}, &auth.OauthToken{}, &options.Skills{}, &extractor.ExtractorBatchExecution{}); err != nil {
 		log.Fatal("マイグレーション失敗:", err)
 	}
 
