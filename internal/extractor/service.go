@@ -1,28 +1,15 @@
 package extractor
 
 import (
-	"encoding/json"
 	"fmt"
-	"log"
+	"net/http"
 	"shakehandz-api/internal/auth"
-	"shakehandz-api/internal/humanresource"
-	"shakehandz-api/internal/shared/apierror"
-	cache_extractor "shakehandz-api/internal/shared/cache/extractor"
-	"shakehandz-api/internal/shared/llm/gemini"
+	"shakehandz-api/internal/shared/auth/oauth"
 	gmsg "shakehandz-api/internal/shared/message/gmail"
-	"shakehandz-api/internal/shared/options"
-	"shakehandz-api/internal/shared/response"
-	"shakehandz-api/prompts"
-	"sort"
-	"strings"
-	"sync"
+	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/google/generative-ai-go/genai"
 	"github.com/redis/go-redis/v9"
-	"golang.org/x/sync/errgroup"
-	"golang.org/x/sync/semaphore"
-	"google.golang.org/api/gmail/v1"
 	"gorm.io/gorm"
 )
 
@@ -33,202 +20,103 @@ type Service struct {
 	rdb     *redis.Client
 }
 
-func NewGeminiService(f gmsg.MessageIF, db *gorm.DB, rdb *redis.Client) *Service {
+func NewExtractorService(f gmsg.MessageIF, db *gorm.DB, rdb *redis.Client) *Service {
 	return &Service{Fetcher: f, DB: db, rdb: rdb}
 }
 
-func (s *Service) Run(c *gin.Context, client *gemini.Client, gmail_svc *gmail.Service) (bool, error) {
-	ctx := c.Request.Context()
+func (s *Service) Run(c *gin.Context) error {
 	user, err := auth.GetUser(c)
+	if err != nil {
+		fmt.Println("ユーザー情報の取得に失敗しました")
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get user information"})
+		return err
+	}
+
+	verified, err := oauth.IsUserVerified(c)
+	if err != nil {
+		fmt.Println("ユーザーの認証に失敗しました")
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+		return err
+	}
+
+	var batchExecution ExtractorBatchExecution
+
+	result := s.DB.Where("user_id = ? AND extractor_type = ?", user.ID, TypeHumanResource).
+		Order("execution_date desc").
+		First(&batchExecution)
+
+	if result.Error != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve batch execution record"})
+		return result.Error
+	}
+
+	fmt.Printf("RefreshExtractorToken called for user: %s\n", user.ID)
+
+	// 更新不要の場合は何もしない
+	// クライアント更新済みの旨を返却
+	if time.Since(batchExecution.ExecutionDate) <= MessageTTL && batchExecution.Status != StatusFailed {
+		fmt.Println("クライアントの更新は不要です")
+		c.JSON(http.StatusOK, gin.H{"message": "現在バッチが進行中"})
+		return nil
+	}
+
+	// ・本日の最後の処理が失敗している
+	var isFailed bool = batchExecution.Status == StatusFailed
+	// ・最後の処理から24時間以上経過している
+	var isExpired bool = time.Since(batchExecution.ExecutionDate) > MessageTTL
+
+	var newBatchExecution ExtractorBatchExecution
+	// クライアントを更新して返却
+	if isExpired || isFailed {
+		// ユーザ認証
+		cli, gmail_svc, err := RefreshExtractorTokenForBackground(verified)
+		if err != nil {
+			fmt.Println("クライアントの更新に失敗しました")
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to refresh extractor token"})
+			return err
+		}
+
+		UpdateClientData(user.ID, gmail_svc, cli)
+
+		if isExpired {
+			fmt.Println("有効期限切れのためClientを更新します")
+		} else {
+			fmt.Println("失敗ステータスのためClientを更新します")
+
+		}
+
+		// 新しいバッチレコードを現在のバッチとして設定
+		newBatchExecution = ExtractorBatchExecution{
+			UserID:        user.ID,
+			ExtractorType: TypeHumanResource,
+			TriggerFrom:   TriggerFront,
+			Status:        StatusInProgress,
+			ExecutionDate: time.Now(),
+		}
+
+		// 新しいバッチレコードを作成
+		r := s.DB.Create(&newBatchExecution)
+
+		if r.Error != nil {
+			fmt.Printf("バッチレコード作成エラー: %v\n", r.Error)
+			return r.Error
+		}
+
+	}
+
+	// バッチ処理を開始
+	// クライアントを更新した場合のみ、新しいバッチレコードを渡す
+	err = RunHumanResourceExtractionBatch(s, user, MessageTTL, &newBatchExecution)
 
 	if err != nil {
-		response.SendError(c, apierror.Common.Unauthorized, response.ErrorDetail{
-			Detail:   err.Error(),
-			Resource: "extract",
-		})
+		fmt.Println("バッチ処理の開始に失敗しました")
+
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to start batch processing"})
+		return err
 	}
 
-	fmt.Println("kmoaiはGmailを取得中")
+	c.JSON(http.StatusOK, gin.H{"message": "Extractor token refreshed"})
 
-	// DB既存のメッセージIDを除外した未処理メッセージを最大N件取得
-	msgs, err := s.fetchUnprocessedMessages(c, gmail_svc, 10)
-	if err != nil {
-		response.SendError(c, apierror.Extractor.FetchUnprocessedMessageFailed, response.ErrorDetail{
-			Detail:   err.Error(),
-			Resource: "extract",
-		})
-		return false, err
-	}
+	return err
 
-	// 未処理メッセージがない場合は空の結果を返す
-	if len(msgs) == 0 {
-		fmt.Println("最新のメールはすべて処理済みです")
-		return false, nil
-	}
-
-	fmt.Println("Gmail取得を完了。今回の解析件数は", len(msgs), "件です。kmoaiにプロンプトを送信中")
-
-	// Redisからステータスを取得
-	progressStatus, err := cache_extractor.FetchJobStatus(c.Request.Context(), s.rdb, "status")
-	if err != nil {
-		response.SendError(c, apierror.Redis.GetDataFailed, response.ErrorDetail{
-			Detail:   err.Error(),
-			Resource: "extract",
-		})
-	}
-
-	// chunkArrayで分割（JSON文字列の配列として）
-	chunkedMsgs := chunkArray(msgs, 3)
-
-	// 共有モデルの浅いコピーを作成してSystemInstructionを一度だけ設定
-	localModel := client.Model
-	localModel.SystemInstruction = &genai.Content{
-		Role:  "system",
-		Parts: []genai.Part{genai.Text(prompts.HRInstruction)},
-	}
-	fmt.Println("kmoaiは準備完了。続いて変換処理へ移行")
-	progressStatus.StartJob("メール内容の構造化を学習中...")
-
-	if err := cache_extractor.UpdateStatusInRedis(c.Request.Context(), s.rdb, progressStatus); err != nil {
-		response.SendError(c, apierror.Redis.UpdateDataFailed, response.ErrorDetail{
-			Detail:   err.Error(),
-			Resource: "extract",
-		})
-	}
-
-	g, ctx := errgroup.WithContext(ctx)
-	var mu sync.Mutex
-	sem := semaphore.NewWeighted(5)
-	var humanResources []humanresource.HumanResource
-
-	// SystemInstruction設定済みのローカルモデルを各ゴルーチンで使用
-	for _, cmsg := range chunkedMsgs {
-		chunk := cmsg // range変数のクロージャ捕捉対策
-		if len(chunk) == 0 {
-			continue
-		}
-
-		if err := sem.Acquire(ctx, 1); err != nil {
-			response.SendError(c, apierror.Common.SemaphoreError, response.ErrorDetail{
-				Detail:   err.Error(),
-				Resource: "extract",
-			})
-			return false, fmt.Errorf("セマフォの取得に失敗: %w", err)
-		}
-
-		g.Go(func() error {
-			defer sem.Release(1)
-
-			// 事前設定されたローカルモデルでGenerateContentを呼び出し
-			geminiResponse, geminiResErr := localModel.GenerateContent(ctx, genai.Text(chunk))
-			if geminiResErr != nil {
-				log.Printf("Gemini API 呼び出し失敗: %v", geminiResErr)
-				return fmt.Errorf("Gemini API 呼び出し失敗: %w", geminiResErr)
-			}
-
-			if geminiResponse == nil {
-				log.Printf("Gemini レスポンスが nil です")
-				return fmt.Errorf("Gemini レスポンスが nil です")
-			}
-
-			geminiResponsePart, ok := gemini.ExtractText(geminiResponse)
-			if !ok {
-				log.Printf("Gemini レスポンスデータの文字列変換不正: %v", geminiResponsePart)
-				return fmt.Errorf("Gemini レスポンスデータの文字列変換不正: %s", geminiResponsePart)
-			}
-
-			trimmedResponse := gemini.TrimPrefixAndSuffixGeminiResponse(geminiResponsePart)
-
-			ChunkHumanResources := []humanresource.HumanResource{}
-
-			if err := json.Unmarshal([]byte(trimmedResponse), &ChunkHumanResources); err != nil {
-				log.Printf("JSON Unmarshal失敗: %v", err)
-				log.Printf("Geminiレスポンス: %s", trimmedResponse)
-				return fmt.Errorf("JSON Unmarshal失敗: %w", err)
-			}
-
-			for _, hr := range ChunkHumanResources {
-				mu.Lock()
-				humanResources = append(humanResources, hr)
-				mu.Unlock()
-				progressStatus.UpdateJobStatus("processing", fmt.Sprintf("抽出作業進行中 進捗:%d/%d", len(humanResources), len(msgs)))
-				if err := cache_extractor.UpdateStatusInRedis(c.Request.Context(), s.rdb, progressStatus); err != nil {
-					log.Printf("ERROR: Failed to update redis: %v", err)
-				}
-			}
-
-			return nil
-		})
-	}
-
-	if err := g.Wait(); err != nil {
-		log.Printf("fetcher: detail fetch error: %v", err)
-		return false, err
-	}
-
-	// 念の為、MessageIDの重複を除外
-	seen := make(map[string]struct{}, len(humanResources))
-	uniq := make([]humanresource.HumanResource, 0, len(humanResources))
-
-	for _, hr := range humanResources {
-		mid := strings.TrimSpace(hr.MessageID)
-		if mid == "" {
-			uniq = append(uniq, hr)
-			continue
-		}
-		if _, ok := seen[mid]; ok {
-			continue
-		}
-		seen[mid] = struct{}{}
-		uniq = append(uniq, hr)
-	}
-
-	humanResources = uniq
-
-	fmt.Println("kmoaiは全ての変換を完了しました。総件数：", len(humanResources), "件です。最後の整形を行なっています")
-
-	// 日付で降順
-	sort.Slice(humanResources, func(i, j int) bool {
-		return humanResources[i].CreatedAt.Unix() > humanResources[j].CreatedAt.Unix()
-	})
-
-	// 登録されたすべてのスキルをまとめる
-	var allSkills []string
-	for _, hr := range humanResources {
-		for _, skill := range hr.MainSkills {
-			allSkills = append(allSkills, skill)
-		}
-		for _, skill := range hr.SubSkills {
-			allSkills = append(allSkills, skill)
-		}
-	}
-
-	fmt.Println("kmoaiは作業を保存中")
-
-	// DB保存処理
-	if len(humanResources) > 0 {
-		for i := range humanResources {
-			humanResources[i].CreatedByID = &user.ID
-			humanResources[i].UpdatedByID = &user.ID
-		}
-
-		// BeforeCreateでUserIDをセットされるので、ここではセット不要
-		if err := s.DB.Create(&humanResources).Error; err != nil {
-			return false, fmt.Errorf("DB保存失敗: %w", err)
-		}
-
-		if err := options.SaveSkills(s.DB, allSkills); err != nil {
-			response.SendError(c, apierror.Options.SaveSkillDataFailed, response.ErrorDetail{
-				Detail:   err.Error(),
-				Resource: "extract",
-			})
-			return false, err
-		}
-	}
-
-	progressStatus.UpdateJobStatus("completed", "メールデータの抽出化を完了しました 🎉")
-	if err := cache_extractor.UpdateStatusInRedis(c.Request.Context(), s.rdb, progressStatus); err != nil {
-		log.Printf("ERROR: Failed to update redis: %v", err)
-	}
-	return true, nil
 }

@@ -27,7 +27,6 @@ func (fetcher *GmailMsgFetcher) FetchMsg(ctx context.Context, svc *gmail.Service
 	return fetcher.FetchMsgDetails(ctx, svc, list)
 }
 
-// ページング版（svc使い回し）
 func (fetcher *GmailMsgFetcher) FetchMsgWithPaging(ctx context.Context, svc *gmail.Service, query string, pageSize int64, pageToken string) ([]*msg.Message, string, error) {
 	if pageSize <= 0 {
 		pageSize = 50

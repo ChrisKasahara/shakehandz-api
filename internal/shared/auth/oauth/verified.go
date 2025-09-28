@@ -27,4 +27,5 @@ func IsUserVerified(c *gin.Context) (auth.AuthContext, error) {
 	}
 
 	return verified, nil
+
 }

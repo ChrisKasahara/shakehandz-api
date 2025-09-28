@@ -1,4 +1,3 @@
-// internal/router/router.go: CORS対応（localhost:3000許可）＋DB依存のルーティング
 package router
 
 import (
@@ -35,7 +34,7 @@ func SetupRouter(rdb *redis.Client) *gin.Engine {
 	// DI
 	gmailMsgFetcher := gmail.NewGmailMsgFetcher()
 	messageSvc := message.NewMessageService(gmailMsgFetcher)
-	geminiService := extractor.NewGeminiService(gmailMsgFetcher, db, rdb)
+	extractorService := extractor.NewExtractorService(gmailMsgFetcher, db, rdb)
 	authService := auth.NewAuthService(db)
 	hrHandler := humanresource.NewHumanResourcesHandler(db)
 	projectHandler := project.NewProjectHandler(db)
@@ -49,8 +48,7 @@ func SetupRouter(rdb *redis.Client) *gin.Engine {
 		protected.GET("/message/gmail", message.MessageHandler(messageSvc, db))
 
 		// AI
-		protected.POST("/structure/humanresource", extractor.StructureWithGeminiHandler(geminiService))
-		protected.GET("/structure/status", extractor.GetStructureStatusHandler(rdb))
+		protected.POST("/structure/humanresource", extractor.RefreshExtractorTokenHandler(extractorService))
 
 		// 要員管理
 		protected.GET("/humanresource/:id", hrHandler.GetHumanResourceByID)
