@@ -28,7 +28,3 @@ func (s *MessageService) Run(ctx context.Context, svc *gmail.Service, query stri
 
 	return idMsgs, nil
 }
-
-func (s *MessageService) RunGetSingleMessage(ctx context.Context, svc *gmail.Service, messageID string) (*msg.Message, error) {
-	return s.Fetcher.GetSingleMessage(ctx, svc, messageID)
-}
