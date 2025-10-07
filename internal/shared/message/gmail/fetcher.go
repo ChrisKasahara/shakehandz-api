@@ -18,8 +18,6 @@ func (fetcher *GmailMsgFetcher) FetchMsg(ctx context.Context, svc *gmail.Service
 		max = 10
 	}
 	list, err := fetcher.FetchMsgIds(svc, query, max)
-
-	// 取得したメールIDをログに出力
 	if err != nil {
 		return nil, err
 	}

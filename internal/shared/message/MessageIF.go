@@ -2,7 +2,6 @@ package shared_message
 
 type Message struct {
 	Id          string       `json:"id"`
-	MessageID   string       `json:"message_id"`
 	Subject     string       `json:"subject"`
 	From        string       `json:"from"`
 	Date        string       `json:"date"`

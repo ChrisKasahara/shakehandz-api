@@ -14,12 +14,10 @@ func ParseMessage(gmsg *gmail.Message) (*msg.Message, error) {
 	if gmsg == nil || gmsg.Payload == nil {
 		return nil, errors.New("empty message")
 	}
-	var subject, from, date, to, cc, replyTo, messageID string
+	var subject, from, date, to, cc, replyTo string
 
 	for _, h := range gmsg.Payload.Headers {
 		switch h.Name {
-		case "Message-ID":
-			messageID = h.Value
 		case "Subject":
 			subject = h.Value
 		case "From":
@@ -48,7 +46,6 @@ func ParseMessage(gmsg *gmail.Message) (*msg.Message, error) {
 	}
 	return &msg.Message{
 		Id:          gmsg.Id,
-		MessageID:   messageID,
 		Subject:     subject,
 		From:        from,
 		Date:        date,
