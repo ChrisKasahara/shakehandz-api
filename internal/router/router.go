@@ -46,6 +46,7 @@ func SetupRouter(rdb *redis.Client) *gin.Engine {
 	{
 		// メール
 		protected.GET("/message/gmail", message.MessageHandler(messageSvc, db))
+		protected.GET("/message/gmail/:id", message.MessageHandlerWithID(messageSvc))
 
 		// AI
 		protected.POST("/structure/humanresource", extractor.RefreshExtractorTokenHandler(extractorService))

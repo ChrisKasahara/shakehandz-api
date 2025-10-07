@@ -13,6 +13,7 @@ type MsgIDFetcherIF interface {
 }
 
 type MsgDetailFetcherIF interface {
+	GetSingleMessage(ctx context.Context, srv *gmail.Service, messageID string) (*m.Message, error)
 	FetchMsgDetails(ctx context.Context, srv *gmail.Service, messages []*gmail.Message) ([]*m.Message, error)
 }
 

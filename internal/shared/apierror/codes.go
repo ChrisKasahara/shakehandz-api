@@ -65,11 +65,15 @@ var Redis = redisErrors{
 // GmailErrors はGmail関連エラーのコードを保持します。
 type GmailErrors struct {
 	CreateClientFailed Code
+	MessageFetchFailed Code
+	MessageNotFound    Code
 }
 
 // Gmail はGmail関連エラーコードのインスタンスです。
 var Gmail = GmailErrors{
 	CreateClientFailed: "GM01_0001",
+	MessageFetchFailed: "GM02_0001",
+	MessageNotFound:    "GM02_0002",
 }
 
 type extractorErrors struct {
